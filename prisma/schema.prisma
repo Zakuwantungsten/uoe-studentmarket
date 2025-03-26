@@ -1,0 +1,299 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified DateTime?
+  password      String
+  image         String?
+  phone         String?
+  studentId     String?   @unique
+  bio           String?   @db.Text
+  title         String?
+  role          Role      @default(USER)
+  status        Status    @default(ACTIVE)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  providedServices Service[]       @relation("provider")
+  bookingsAsCustomer Booking[]     @relation("customer")
+  bookingsAsProvider Booking[]     @relation("provider")
+  reviewsGiven      Review[]       @relation("reviewer")
+  reviewsReceived   Review[]       @relation("reviewee")
+  sentMessages      Message[]      @relation("sender")
+  receivedMessages  Message[]      @relation("recipient")
+  skills            UserSkill[]
+  education         Education[]
+  certification     Certification[]
+  transactions      Transaction[]
+
+  @@map("users")
+}
+
+model UserSkill {
+  id        String   @id @default(cuid())
+  userId    String
+  skill     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_skills")
+}
+
+model Education {
+  id          String   @id @default(cuid())
+  userId      String
+  institution String
+  degree      String
+  fieldOfStudy String
+  startDate   DateTime
+  endDate     DateTime?
+  current     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("education")
+}
+
+model Certification {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  organization String
+  issueDate    DateTime
+  expiryDate   DateTime?
+  credentialId String?
+  credentialUrl String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("certifications")
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?   @db.Text
+  icon        String?
+  slug        String    @unique
+  count       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  services    Service[]
+
+  @@map("categories")
+}
+
+model Service {
+  id          String    @id @default(cuid())
+  title       String
+  description String    @db.Text
+  price       Float
+  priceType   String?
+  location    String
+  image       String?
+  featured    Boolean   @default(false)
+  discount    Int?
+  availability String?
+  deliveryTime String?
+  status      Status    @default(ACTIVE)
+  providerId  String
+  categoryId  String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  provider    User      @relation("provider", fields: [providerId], references: [id], onDelete: Cascade)
+  category    Category  @relation(fields: [categoryId], references: [id])
+  bookings    Booking[]
+  reviews     Review[]
+  features    ServiceFeature[]
+
+  @@map("services")
+}
+
+model ServiceFeature {
+  id        String   @id @default(cuid())
+  serviceId String
+  feature   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  service   Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@map("service_features")
+}
+
+model Booking {
+  id          String        @id @default(cuid())
+  customerId  String
+  providerId  String
+  serviceId   String
+  date        DateTime
+  startTime   DateTime?
+  endTime     DateTime?
+  status      BookingStatus @default(PENDING)
+  totalAmount Float
+  notes       String?       @db.Text
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  customer    User          @relation("customer", fields: [customerId], references: [id])
+  provider    User          @relation("provider", fields: [providerId], references: [id])
+  service     Service       @relation(fields: [serviceId], references: [id])
+  review      Review?
+  transaction Transaction?
+
+  @@map("bookings")
+}
+
+model Review {
+  id          String   @id @default(cuid())
+  rating      Int
+  comment     String?  @db.Text
+  reviewerId  String
+  revieweeId  String
+  serviceId   String
+  bookingId   String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  reviewer    User     @relation("reviewer", fields: [reviewerId], references: [id])
+  reviewee    User     @relation("reviewee", fields: [revieweeId], references: [id])
+  service     Service  @relation(fields: [serviceId], references: [id])
+  booking     Booking  @relation(fields: [bookingId], references: [id])
+
+  @@map("reviews")
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  content     String   @db.Text
+  senderId    String
+  recipientId String
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  sender      User     @relation("sender", fields: [senderId], references: [id])
+  recipient   User     @relation("recipient", fields: [recipientId], references: [id])
+
+  @@map("messages")
+}
+
+model Transaction {
+  id          String           @id @default(cuid())
+  amount      Float
+  currency    String           @default("KES")
+  status      TransactionStatus @default(PENDING)
+  paymentMethod String
+  paymentId   String?
+  userId      String
+  bookingId   String?          @unique
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  // Relations
+  user        User             @relation(fields: [userId], references: [id])
+  booking     Booking?         @relation(fields: [bookingId], references: [id])
+
+  @@map("transactions")
+}
+
+model Discussion {
+  id          String   @id @default(cuid())
+  title       String
+  content     String   @db.Text
+  authorId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  comments    Comment[]
+
+  @@map("discussions")
+}
+
+model Comment {
+  id           String   @id @default(cuid())
+  content      String   @db.Text
+  authorId     String
+  discussionId String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  discussion   Discussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+
+  @@map("comments")
+}
+
+model Event {
+  id          String   @id @default(cuid())
+  title       String
+  description String   @db.Text
+  location    String
+  startDate   DateTime
+  endDate     DateTime
+  image       String?
+  organizerId String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("events")
+}
+
+enum Role {
+  USER
+  PROVIDER
+  ADMIN
+}
+
+enum Status {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
