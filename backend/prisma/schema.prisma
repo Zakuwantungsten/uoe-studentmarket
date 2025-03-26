@@ -1,39 +1,37 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["mongodb"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "mongodb"
+  url      = env("MONGODB_URI")
 }
 
 model User {
-  id            String    @id @default(cuid())
+  id            String     @id @default(auto()) @map("_id") @db.ObjectId
   name          String
-  email         String    @unique
+  email         String     @unique
   emailVerified DateTime?
   password      String
   image         String?
   phone         String?
-  studentId     String?   @unique
-  bio           String?   @db.Text
+  studentId     String?    @unique
+  bio           String?
   title         String?
-  role          Role      @default(USER)
-  status        Status    @default(ACTIVE)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  role          Role       @default(USER)
+  status        Status     @default(ACTIVE)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   // Relations
-  providedServices Service[]       @relation("provider")
-  bookingsAsCustomer Booking[]     @relation("customer")
-  bookingsAsProvider Booking[]     @relation("provider")
-  reviewsGiven      Review[]       @relation("reviewer")
-  reviewsReceived   Review[]       @relation("reviewee")
-  sentMessages      Message[]      @relation("sender")
-  receivedMessages  Message[]      @relation("recipient")
+  providedServices Service[]       @relation("ServiceProvider")
+  bookingsAsCustomer Booking[]     @relation("BookingCustomer")
+  bookingsAsProvider Booking[]     @relation("BookingProvider")
+  reviewsGiven      Review[]       @relation("ReviewGiven")
+  reviewsReceived   Review[]       @relation("ReviewReceived")
+  sentMessages      Message[]      @relation("MessageSent")
+  receivedMessages  Message[]      @relation("MessageReceived")
   skills            UserSkill[]
   education         Education[]
   certification     Certification[]
@@ -43,21 +41,20 @@ model User {
 }
 
 model UserSkill {
-  id        String   @id @default(cuid())
-  userId    String
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
   skill     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
 
   @@map("user_skills")
 }
 
 model Education {
-  id          String   @id @default(cuid())
-  userId      String
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
   institution String
   degree      String
   fieldOfStudy String
@@ -67,15 +64,14 @@ model Education {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
 
   @@map("education")
 }
 
 model Certification {
-  id           String   @id @default(cuid())
-  userId       String
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String   @db.ObjectId
   name         String
   organization String
   issueDate    DateTime
@@ -85,32 +81,30 @@ model Certification {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
 
   @@map("certifications")
 }
 
 model Category {
-  id          String    @id @default(cuid())
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
   name        String    @unique
-  description String?   @db.Text
+  description String?
   icon        String?
   slug        String    @unique
   count       Int       @default(0)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  // Relations
   services    Service[]
 
   @@map("categories")
 }
 
 model Service {
-  id          String    @id @default(cuid())
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
   title       String
-  description String    @db.Text
+  description String
   price       Float
   priceType   String?
   location    String
@@ -120,13 +114,12 @@ model Service {
   availability String?
   deliveryTime String?
   status      Status    @default(ACTIVE)
-  providerId  String
-  categoryId  String
+  providerId  String    @db.ObjectId
+  categoryId  String    @db.ObjectId
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  // Relations
-  provider    User      @relation("provider", fields: [providerId], references: [id], onDelete: Cascade)
+  provider    User      @relation("ServiceProvider", fields: [providerId], references: [id])
   category    Category  @relation(fields: [categoryId], references: [id])
   bookings    Booking[]
   reviews     Review[]
@@ -136,35 +129,33 @@ model Service {
 }
 
 model ServiceFeature {
-  id        String   @id @default(cuid())
-  serviceId String
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  serviceId String   @db.ObjectId
   feature   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
-  service   Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  service   Service  @relation(fields: [serviceId], references: [id])
 
   @@map("service_features")
 }
 
 model Booking {
-  id          String        @id @default(cuid())
-  customerId  String
-  providerId  String
-  serviceId   String
+  id          String        @id @default(auto()) @map("_id") @db.ObjectId
+  customerId  String        @db.ObjectId
+  providerId  String        @db.ObjectId
+  serviceId   String        @db.ObjectId
   date        DateTime
   startTime   DateTime?
   endTime     DateTime?
   status      BookingStatus @default(PENDING)
   totalAmount Float
-  notes       String?       @db.Text
+  notes       String?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  // Relations
-  customer    User          @relation("customer", fields: [customerId], references: [id])
-  provider    User          @relation("provider", fields: [providerId], references: [id])
+  customer    User          @relation("BookingCustomer", fields: [customerId], references: [id])
+  provider    User          @relation("BookingProvider", fields: [providerId], references: [id])
   service     Service       @relation(fields: [serviceId], references: [id])
   review      Review?
   transaction Transaction?
@@ -173,19 +164,18 @@ model Booking {
 }
 
 model Review {
-  id          String   @id @default(cuid())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   rating      Int
-  comment     String?  @db.Text
-  reviewerId  String
-  revieweeId  String
-  serviceId   String
-  bookingId   String   @unique
+  comment     String?
+  reviewerId  String   @db.ObjectId
+  revieweeId  String   @db.ObjectId
+  serviceId   String   @db.ObjectId
+  bookingId   String   @unique @db.ObjectId
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  // Relations
-  reviewer    User     @relation("reviewer", fields: [reviewerId], references: [id])
-  reviewee    User     @relation("reviewee", fields: [revieweeId], references: [id])
+  reviewer    User     @relation("ReviewGiven", fields: [reviewerId], references: [id])
+  reviewee    User     @relation("ReviewReceived", fields: [revieweeId], references: [id])
   service     Service  @relation(fields: [serviceId], references: [id])
   booking     Booking  @relation(fields: [bookingId], references: [id])
 
@@ -193,34 +183,32 @@ model Review {
 }
 
 model Message {
-  id          String   @id @default(cuid())
-  content     String   @db.Text
-  senderId    String
-  recipientId String
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  content     String
+  senderId    String   @db.ObjectId
+  recipientId String   @db.ObjectId
   read        Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  // Relations
-  sender      User     @relation("sender", fields: [senderId], references: [id])
-  recipient   User     @relation("recipient", fields: [recipientId], references: [id])
+  sender      User     @relation("MessageSent", fields: [senderId], references: [id])
+  recipient   User     @relation("MessageReceived", fields: [recipientId], references: [id])
 
   @@map("messages")
 }
 
 model Transaction {
-  id          String           @id @default(cuid())
+  id          String           @id @default(auto()) @map("_id") @db.ObjectId
   amount      Float
   currency    String           @default("KES")
   status      TransactionStatus @default(PENDING)
   paymentMethod String
   paymentId   String?
-  userId      String
-  bookingId   String?          @unique
+  userId      String           @db.ObjectId
+  bookingId   String?          @unique @db.ObjectId
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
-  // Relations
   user        User             @relation(fields: [userId], references: [id])
   booking     Booking?         @relation(fields: [bookingId], references: [id])
 
@@ -228,42 +216,40 @@ model Transaction {
 }
 
 model Discussion {
-  id          String   @id @default(cuid())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   title       String
-  content     String   @db.Text
-  authorId    String
+  content     String
+  authorId    String   @db.ObjectId
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  // Relations
   comments    Comment[]
 
   @@map("discussions")
 }
 
 model Comment {
-  id           String   @id @default(cuid())
-  content      String   @db.Text
-  authorId     String
-  discussionId String
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  content      String
+  authorId     String   @db.ObjectId
+  discussionId String   @db.ObjectId
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  // Relations
-  discussion   Discussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  discussion   Discussion @relation(fields: [discussionId], references: [id])
 
   @@map("comments")
 }
 
 model Event {
-  id          String   @id @default(cuid())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   title       String
-  description String   @db.Text
+  description String
   location    String
   startDate   DateTime
   endDate     DateTime
   image       String?
-  organizerId String
+  organizerId String   @db.ObjectId
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -296,4 +282,3 @@ enum TransactionStatus {
   FAILED
   REFUNDED
 }
-
