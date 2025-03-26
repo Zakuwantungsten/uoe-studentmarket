@@ -605,5 +605,41 @@ exports.getBookingsByDateRange = async (req, res) => {
       error: error.message,
     })
   }
+    
+
 }
+
+// Delete booking permanently (admin only)
+exports.deleteBooking = async (req, res) => {
+  try {
+    // Admin check
+    if (req.user.role !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Only admins can delete bookings permanently"
+      });
+    }
+
+    const booking = await Booking.findByIdAndDelete(req.params.id);
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found"
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Booking deleted permanently"
+    });
+  } catch (error) {
+    console.error("[Booking Delete Error]", error);
+    res.status(500).json({
+      success: false,
+      message: "Error deleting booking",
+      error: error.message
+    });
+  }
+};
 

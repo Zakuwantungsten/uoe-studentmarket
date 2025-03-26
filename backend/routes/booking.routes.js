@@ -13,7 +13,7 @@ router.post("/", authController.protect, bookingController.createBooking)
 router.get("/:id", authController.protect, bookingController.getBookingById)
 
 // Update booking
-router.patch("/:id", authController.protect, bookingController.updateBooking)
+router.patch("/:id", authController.protect, bookingController.updateBookingStatus)
 
 // Delete booking
 router.delete("/:id", authController.protect, bookingController.deleteBooking)

@@ -3,11 +3,10 @@ const router = express.Router()
 const messageController = require("../controllers/message.controller")
 const authController = require("../controllers/auth.controller")
 
-// Get conversations or messages
-router.get("/", authController.protect, messageController.getMessages)
+// Get conversations
+router.get("/", authController.protect, messageController.getConversations)
 
-// Create a new message
-router.post("/", authController.protect, messageController.createMessage)
+// Send a new message (using existing sendMessage export)
+router.post("/", authController.protect, messageController.sendMessage)
 
 module.exports = router
-

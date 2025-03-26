@@ -42,7 +42,6 @@ exports.sendMessage = async (req, res) => {
   }
 }
 
-// Get conversation with a user
 exports.getConversation = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -78,55 +77,36 @@ exports.getConversation = async (req, res) => {
         { sender: req.user.id, recipient: userId },
         { sender: userId, recipient: req.user.id }
       ]
-    });\
-      recipient: userId }
-  ,
-  sender: userId, recipient
-  : req.user.id
-  ]
-}
-)
+    });
 
-// Mark messages as read
-await Message.updateMany(
-{
-  sender: userId, recipient
-  : req.user.id, read: false
-}
-,
-{
-  read: true, readAt
-  : Date.now()
-}
-,
-)
+    // Mark messages as read
+    await Message.updateMany(
+      { sender: userId, recipient: req.user.id, read: false },
+      { read: true, readAt: Date.now() }
+    );
 
-res.status(200).json(
-{
-  success: true, count
-  : messages.length,
-  total,
-  totalPages: Math.ceil(total / limit),
-  currentPage: page,
-  data: messages,
-  user:
-  _id: user._id, name
-  : user.name,
-    image: user.image,
-  ,
-}
-)
-} catch (error)
-{
-  console.error("Error getting conversation:", error)
-  res.status(500).json({
-    success: false,
-    message: "Error getting conversation",
-    error: error.message,
-  })
-}
-}
-
+    res.status(200).json({
+      success: true,
+      count: messages.length,
+      total,
+      totalPages: Math.ceil(total / limit),
+      currentPage: page,
+      data: messages,
+      user: {
+        _id: user._id,
+        name: user.name,
+        image: user.image
+      }
+    });
+  } catch (error) {
+    console.error("Error getting conversation:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error getting conversation",
+      error: error.message,
+    });
+  }
+};
 // Get all conversations
 exports.getConversations = async (req, res) =>
 {
