@@ -15,10 +15,26 @@ export const authService = {
     studentId?: string
   }) => apiClient.post<ApiResponse<LoginResponse>>("/auth/register", data),
 
-  login: (data: {
+  login: async (data: {
     email: string
     password: string
-  }) => apiClient.post<ApiResponse<LoginResponse>>("/auth/login", data),
+  }) => {
+    try {
+      const response = await apiClient.post<ApiResponse<LoginResponse>>("/auth/login", data)
+      
+      // Add extra validation
+      if (!response.data) {
+        console.error('Login response lacks data:', response)
+        throw new Error(response.message || 'Login failed')
+      }
+  
+      console.log('Login successful:', response.data.user.email)
+      return response
+    } catch (error) {
+      console.error('Login service error:', error)
+      throw error
+    }
+  },
 
   getProfile: (token: string) => 
     apiClient.get<ApiResponse<User>>("/auth/me", {

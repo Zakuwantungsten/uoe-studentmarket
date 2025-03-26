@@ -56,21 +56,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const response = await authService.login({ email, password })
       
-      if (!response.data) {
+      // Updated response handling
+      if (!response.data || !response.data.user || !response.data.token) {
         throw new Error(response.message || "Login failed")
       }
-
+  
       const { user: userData, token: authToken } = response.data
-
+  
       localStorage.setItem("token", authToken)
       setUser(userData)
       setToken(authToken)
-
+  
       toast({
         title: "Login successful",
         description: `Welcome back, ${userData.name}!`,
       })
-
+  
       router.push(userData.role === "ADMIN" ? "/admin" : "/dashboard")
     } catch (error: any) {
       toast({
