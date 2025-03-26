@@ -1,107 +1,196 @@
 import type { LucideIcon } from "lucide-react"
+import { DefaultSession, DefaultUser } from "next-auth"
 
+// Core Types
 export interface User {
-  _id: string
+  id: string
   name: string
   email: string
-  role: "customer" | "provider" | "admin"
-  profileImage?: string
-  bio?: string
+  emailVerified?: Date
+  password: string
+  image?: string
   phone?: string
-  location?: string
-  rating?: number
-  totalReviews?: number
-  badges?: string[]
-  createdAt: string
-  updatedAt: string
+  studentId?: string
+  bio?: string
+  title?: string
+  role: "USER" | "PROVIDER" | "ADMIN"
+  status: "ACTIVE" | "INACTIVE" | "SUSPENDED"
+  createdAt: Date
+  updatedAt: Date
 }
 
 export interface Provider extends User {
   services?: Service[]
   specialties?: string[]
   availability?: string
-  education?: string
-  experience?: string
+  education?: Education[]
+  certification?: Certification[]
 }
 
 export interface Category {
-  _id: string
+  id: string
   name: string
-  icon?: string
   description?: string
+  icon?: string
+  slug: string
   count?: number
-  createdAt: string
-  updatedAt: string
+  createdAt: Date
+  updatedAt: Date
 }
 
 export interface Service {
-  _id: string
+  id: string
   title: string
   description: string
   price: number
   priceType?: string
   location: string
-  provider: User
-  category: Category
-  categoryId: string
-  features: string[]
-  images?: string[]
-  rating?: number
-  reviewCount?: number
-  availability?: string
-  deliveryTime?: string
+  image?: string
   featured?: boolean
   discount?: number
-  status: "active" | "inactive" | "pending"
-  createdAt: string
-  updatedAt: string
+  availability?: string
+  deliveryTime?: string
+  status: "ACTIVE" | "INACTIVE" | "SUSPENDED"
+  provider: User
+  category: Category
+  features: ServiceFeature[]
+  createdAt: Date
+  updatedAt: Date
 }
 
-export interface Review {
-  _id: string
-  service: Service
-  reviewer: User
-  rating: number
-  comment: string
-  createdAt: string
-  updatedAt: string
+export interface ServiceFeature {
+  id: string
+  feature: string
+  createdAt: Date
+  updatedAt: Date
 }
 
 export interface Booking {
-  _id: string
-  service: Service
+  id: string
   customer: User
   provider: User
-  date: string
-  status: "pending" | "confirmed" | "completed" | "cancelled"
+  service: Service
+  date: Date
+  startTime?: Date
+  endTime?: Date
+  status: "PENDING" | "CONFIRMED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED"
+  totalAmount: number
   notes?: string
-  price: number
-  paymentStatus: "pending" | "paid" | "refunded"
-  createdAt: string
-  updatedAt: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface Review {
+  id: string
+  rating: number
+  comment?: string
+  reviewer: User
+  reviewee: User
+  service: Service
+  booking: Booking
+  createdAt: Date
+  updatedAt: Date
 }
 
 export interface Message {
-  _id: string
+  id: string
+  content: string
   sender: User
   recipient: User
-  content: string
   read: boolean
-  createdAt: string
-  updatedAt: string
+  createdAt: Date
+  updatedAt: Date
 }
 
 export interface Transaction {
-  _id: string
-  booking: Booking
+  id: string
   amount: number
+  currency: string
+  status: "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED"
   paymentMethod: string
-  status: "pending" | "completed" | "failed" | "refunded"
-  reference: string
-  createdAt: string
-  updatedAt: string
+  paymentId?: string
+  user: User
+  booking?: Booking
+  createdAt: Date
+  updatedAt: Date
 }
 
+export interface Education {
+  id: string
+  institution: string
+  degree: string
+  fieldOfStudy: string
+  startDate: Date
+  endDate?: Date
+  current?: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface Certification {
+  id: string
+  name: string
+  organization: string
+  issueDate: Date
+  expiryDate?: Date
+  credentialId?: string
+  credentialUrl?: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface Discussion {
+  id: string
+  title: string
+  content: string
+  author: User
+  comments: Comment[]
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface Comment {
+  id: string
+  content: string
+  author: User
+  discussion: Discussion
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface Event {
+  id: string
+  title: string
+  description: string
+  location: string
+  startDate: Date
+  endDate: Date
+  image?: string
+  organizer: User
+  createdAt: Date
+  updatedAt: Date
+}
+
+// NextAuth Type Extensions
+declare module "next-auth" {
+  interface Session extends DefaultSession {
+    user: User & DefaultSession["user"]
+  }
+  
+  interface User extends DefaultUser {
+    role: "USER" | "PROVIDER" | "ADMIN"
+    studentId?: string
+    status: "ACTIVE" | "INACTIVE" | "SUSPENDED"
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    user: User
+  }
+}
+
+// Response Types
 export interface ApiResponse<T> {
   success: boolean
   data: T
@@ -119,7 +208,7 @@ export interface PaginatedResponse<T> {
 }
 
 export interface Notification {
-  _id: string
+  id: string
   recipient: User
   type: "booking" | "message" | "review" | "payment" | "system"
   title: string
@@ -132,10 +221,9 @@ export interface Notification {
     messageId?: string
     reviewId?: string
   }
-  createdAt: string
-  updatedAt: string
+  createdAt: Date
+  updatedAt: Date
 }
 
 // Map for category icons
 export const categoryIconMap: Record<string, LucideIcon> = {}
-

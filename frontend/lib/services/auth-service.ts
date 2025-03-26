@@ -6,34 +6,44 @@ interface LoginResponse {
   token: string
 }
 
-interface RegisterData {
-  name: string
-  email: string
-  password: string
-  role: "customer" | "provider"
-}
-
-interface LoginData {
-  email: string
-  password: string
-}
-
 export const authService = {
-  register: (data: RegisterData) => apiClient.post<ApiResponse<LoginResponse>>("/auth/register", data),
+  register: (data: {
+    name: string
+    email: string
+    password: string
+    role: "USER" | "PROVIDER" // Updated to match Prisma enum
+    studentId?: string
+  }) => apiClient.post<ApiResponse<LoginResponse>>("/auth/register", data),
 
-  login: (data: LoginData) => apiClient.post<ApiResponse<LoginResponse>>("/auth/login", data),
+  login: (data: {
+    email: string
+    password: string
+  }) => apiClient.post<ApiResponse<LoginResponse>>("/auth/login", data),
 
-  getProfile: (token: string) => apiClient.get<ApiResponse<User>>("/users/me", { token }),
+  getProfile: (token: string) => 
+    apiClient.get<ApiResponse<User>>("/auth/me", {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    }),
 
-  updateProfile: (data: Partial<User>, token: string) => apiClient.put<ApiResponse<User>>("/users/me", data, { token }),
+  updateProfile: (data: Partial<User>, token: string) =>
+    apiClient.put<ApiResponse<User>>("/users/me", data, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    }),
 
   changePassword: (data: { currentPassword: string; newPassword: string }, token: string) =>
-    apiClient.post<ApiResponse<{ message: string }>>("/auth/change-password", data, { token }),
+    apiClient.post<ApiResponse<{ message: string }>>("/auth/change-password", data, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    }),
 
   forgotPassword: (email: string) =>
     apiClient.post<ApiResponse<{ message: string }>>("/auth/forgot-password", { email }),
 
   resetPassword: (data: { token: string; password: string }) =>
-    apiClient.post<ApiResponse<{ message: string }>>("/auth/reset-password", data),
+    apiClient.post<ApiResponse<{ message: string }>>("/auth/reset-password", data)
 }
-
