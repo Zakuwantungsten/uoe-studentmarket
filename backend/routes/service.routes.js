@@ -6,6 +6,9 @@ const authController = require("../controllers/auth.controller")
 // Get all services
 router.get("/", serviceController.getAllServices)
 
+// NEW: Add this line right here ↓
+router.get("/featured", serviceController.getAllServices)
+
 // Create a new service
 router.post("/", authController.protect, serviceController.createService)
 

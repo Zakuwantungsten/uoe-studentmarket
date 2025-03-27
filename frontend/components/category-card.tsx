@@ -40,7 +40,7 @@ export default function CategoryCard({ category }: CategoryCardProps) {
   const { _id, name, count } = category
 
   // Determine which icon to use
-  const IconComponent = iconMap[name] || Book
+  const IconComponent = iconMap[name as keyof typeof iconMap] || Book
 
   return (
     <Link href={`/categories/${_id}`}>
