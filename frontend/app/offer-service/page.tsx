@@ -160,7 +160,9 @@ export default function OfferServicePage() {
         const formData = new FormData()
         formData.append("file", imageFile)
         
-        const response = await apiClient.upload("/upload/file", formData) as { 
+        // Only pass token if it exists
+        const options = token ? { token } : {}
+        const response = await apiClient.upload("/upload/file", formData, options) as { 
           success: boolean; 
           data: { url: string } 
         }
@@ -170,16 +172,28 @@ export default function OfferServicePage() {
       }
 
       // Format data for API
+      const { categoryId, ...restFormData } = formData
+      
+      // Transform features from string array to object array as expected by backend
+      const formattedFeatures = formData.features.map(feature => ({ feature }))
+      
       const serviceData = {
-        ...formData,
+        ...restFormData,
         description: finalDescription,
         location: finalLocation,
         image: imageUrl,
+        // Add images array for service card compatibility
+        images: imageUrl ? [imageUrl] : [],
         price: Number.parseFloat(formData.price),
         discount: formData.discount ? Number.parseInt(formData.discount) : undefined,
+        // Map categoryId to category for backend compatibility
+        category: categoryId,
+        // Replace features array with properly formatted objects
+        features: formattedFeatures,
       }
 
-      await serviceService.createService(serviceData, token as string)
+      // Use type assertion to resolve TypeScript error
+      await serviceService.createService(serviceData as any, token as string)
 
       toast({
         title: "Success",
