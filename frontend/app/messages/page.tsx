@@ -27,10 +27,10 @@ interface Conversation {
   unreadCount: number
 }
 
-export const metadata: Metadata = {
+/*export const metadata: Metadata = {
   title: "Messages | UoE Student Marketplace",
   description: "Chat with other students on the University of Eldoret Student Marketplace",
-}
+}*/
 
 export default function MessagesPage() {
   const { user, token, isAuthenticated, isLoading: authLoading } = useAuth()
@@ -258,7 +258,7 @@ export default function MessagesPage() {
                   <div>
                     <p className="font-medium">{selectedUser.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {selectedUser.role === "provider" ? "Service Provider" : "Customer"}
+                      {selectedUser.role === "PROVIDER" ? "Service Provider" : "Customer"}
                     </p>
                   </div>
                 </div>

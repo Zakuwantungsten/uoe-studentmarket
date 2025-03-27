@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react"
 
 // User types
 export interface User {
+  profileImage: string | undefined
   _id: string
   name: string
   email: string
@@ -48,7 +49,6 @@ export interface Provider extends User {
   services?: Service[]
   specialties?: string[]
   availability?: string
-  education?: string
   experience?: string
 }
 
