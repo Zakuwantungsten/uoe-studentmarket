@@ -29,16 +29,31 @@ const bookingSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["PENDING", "CONFIRMED", "IN_PROGRESS", "COMPLETED", "CANCELLED"],
-      default: "PENDING",
+      enum: ["pending", "confirmed", "in_progress", "completed", "cancelled"],
+      default: "pending",
     },
     totalAmount: {
       type: Number,
       required: true,
       min: 0,
     },
+    paymentStatus: {
+      type: String,
+      enum: ["pending", "paid", "refunded"],
+      default: "pending",
+    },
     notes: {
       type: String,
+    },
+    cancellationReason: {
+      type: String,
+    },
+    cancelledBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    cancelledAt: {
+      type: Date,
     },
   },
   {

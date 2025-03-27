@@ -34,15 +34,16 @@ exports.createBooking = async (req, res) => {
       customer: req.user.id,
       provider: service.provider._id,
       date,
-      startTime,
-      endTime,
+      startTime: startTime || date, // Use date as fallback if startTime not provided
+      endTime: endTime || null,
       notes,
       totalAmount,
       status: "pending",
+      paymentStatus: "pending",
     })
 
     // Populate booking
-    await booking.populate("service", "title price")
+    await booking.populate("service", "title price images")
     await booking.populate("customer", "name email phone image")
     await booking.populate("provider", "name email phone image")
 

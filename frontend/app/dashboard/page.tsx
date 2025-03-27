@@ -44,17 +44,12 @@ export default function DashboardPage() {
       try {
         setIsLoading(true)
 
-        const response = await apiClient.get<{ success: boolean; data: DashboardStats }>("/users/dashboard-stats", {
+        const response = await apiClient.get<DashboardStats>("/api/users/dashboard-stats", {
           token,
         })
 
-        // Check if response has the expected structure
-        if (response.success && response.data) {
-          setStats(response.data)
-        } else {
-          console.error("Unexpected API response structure:", response)
-          handleApiError(new Error("Unexpected API response structure"), "Failed to load dashboard data")
-        }
+        // Set the stats directly since the frontend API route already formats the data
+        setStats(response)
       } catch (error) {
         handleApiError(error, "Failed to load dashboard data")
       } finally {
@@ -114,7 +109,7 @@ export default function DashboardPage() {
               positive: true,
             }}
           />
-          {user?.role === "provider" ? (
+          {user?.role === "PROVIDER" ? (
             <>
               <StatsCard
                 title="Total Earnings"
@@ -178,16 +173,16 @@ export default function DashboardPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>{user?.role === "provider" ? "Earnings Summary" : "Upcoming Bookings"}</CardTitle>
+              <CardTitle>{user?.role === "PROVIDER" ? "Earnings Summary" : "Upcoming Bookings"}</CardTitle>
               <CardDescription>
-                {user?.role === "provider" ? "Your earnings over time" : "Your scheduled services"}
+                {user?.role === "PROVIDER" ? "Your earnings over time" : "Your scheduled services"}
               </CardDescription>
             </CardHeader>
-            <CardContent>{user?.role === "provider" ? <EarningsSummary /> : <UpcomingBookings />}</CardContent>
+            <CardContent>{user?.role === "PROVIDER" ? <EarningsSummary /> : <UpcomingBookings />}</CardContent>
           </Card>
         </div>
 
-        {user?.role === "provider" && (
+        {user?.role === "PROVIDER" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <Card className="lg:col-span-2">
               <CardHeader>
@@ -236,7 +231,7 @@ export default function DashboardPage() {
 
         <div className="flex flex-col sm:flex-row gap-4">
           <Button asChild>
-            {user?.role === "provider" ? (
+            {user?.role === "PROVIDER" ? (
               <Link href="/my-services/create">Create New Service</Link>
             ) : (
               <Link href="/services">Browse Services</Link>

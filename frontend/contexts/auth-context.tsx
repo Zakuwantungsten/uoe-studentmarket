@@ -34,20 +34,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const initializeAuth = async () => {
-      const storedToken = localStorage.getItem("token")
-      if (storedToken) {
-        try {
-          const response = await authService.getProfile(storedToken)
-          if (response.data) {
-            setUser(response.data)
-            setToken(storedToken)
+      try {
+        // Ensure this only runs on the client side
+        if (typeof window !== 'undefined') {
+          const storedToken = localStorage.getItem("token")
+          if (storedToken) {
+            try {
+              const response = await authService.getProfile(storedToken)
+              if (response.data) {
+                setUser(response.data)
+                setToken(storedToken)
+              }
+            } catch (error) {
+              console.error("Error validating token:", error)
+              // Don't remove token on every error - only if it's an auth error
+              if (error instanceof Error && 
+                  (error.message.includes('unauthorized') || 
+                   error.message.includes('invalid token') ||
+                   error.message.includes('jwt'))) {
+                console.log("Removing invalid token")
+                localStorage.removeItem("token")
+              }
+            }
           }
-        } catch (error) {
-          localStorage.removeItem("token")
         }
+      } catch (error) {
+        console.error("Auth initialization error:", error)
+      } finally {
+        setIsLoading(false)
       }
-      setIsLoading(false)
     }
+    
     initializeAuth()
   }, [])
 
@@ -63,7 +80,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   
       const { user: userData, token: authToken } = response.data
   
-      localStorage.setItem("token", authToken)
+      // Ensure this only runs on the client side
+      if (typeof window !== 'undefined') {
+        // Store token with proper error handling
+        try {
+          localStorage.setItem("token", authToken)
+        } catch (storageError) {
+          console.error("Error storing token:", storageError)
+          // Continue anyway since we have the token in memory
+        }
+      }
+      
       setUser(userData)
       setToken(authToken)
   
@@ -123,7 +150,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error("Missing user or token in response")
       }
 
-      localStorage.setItem("token", authToken)
+      // Ensure this only runs on the client side
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem("token", authToken)
+        } catch (storageError) {
+          console.error("Error storing token during registration:", storageError)
+          // Continue anyway since we have the token in memory
+        }
+      }
+      
       setUser(userData)
       setToken(authToken)
 
@@ -148,7 +184,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const logout = () => {
-    localStorage.removeItem("token")
+    // Ensure this only runs on the client side
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem("token")
+      } catch (error) {
+        console.error("Error removing token:", error)
+      }
+    }
+    
     setToken(null)
     setUser(null)
     router.push("/")

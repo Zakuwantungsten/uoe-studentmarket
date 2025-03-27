@@ -37,9 +37,20 @@ async function fetchApi<T>(endpoint: string, options: FetchOptions = {}): Promis
     headers.set("Content-Type", "application/json")
   }
 
-  // Add authorization token if provided
+  // Add authorization token if provided in options
   if (token) {
     headers.set("Authorization", `Bearer ${token}`)
+  } 
+  // Otherwise, try to get token from localStorage (client-side only)
+  else if (typeof window !== 'undefined') {
+    try {
+      const storedToken = localStorage.getItem("token")
+      if (storedToken) {
+        headers.set("Authorization", `Bearer ${storedToken}`)
+      }
+    } catch (error) {
+      console.error("Error accessing localStorage for token:", error)
+    }
   }
 
   try {
@@ -48,8 +59,32 @@ async function fetchApi<T>(endpoint: string, options: FetchOptions = {}): Promis
       headers,
     })
 
-    // Parse the JSON response
-    const data = await response.json()
+    // Check if response is JSON before parsing
+    const contentType = response.headers.get('content-type')
+    let data: any
+    
+    if (contentType && contentType.includes('application/json')) {
+      // Parse JSON response
+      try {
+        data = await response.json()
+      } catch (parseError) {
+        // If JSON parsing fails, get text content instead
+        const textContent = await response.text()
+        console.error('JSON parsing error:', parseError, 'Response text:', textContent.substring(0, 200))
+        throw new ApiError(`Failed to parse JSON response: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`, response.status, textContent)
+      }
+    } else {
+      // For non-JSON responses, get text content
+      const textContent = await response.text()
+      
+      if (!response.ok) {
+        console.error(`Non-JSON error response (${response.status}):`, textContent.substring(0, 200))
+        throw new ApiError(`Server returned non-JSON response: ${textContent.substring(0, 100)}...`, response.status, textContent)
+      }
+      
+      // If response is OK but not JSON, return text as data
+      data = { text: textContent, _isTextResponse: true }
+    }
 
     // Handle API errors with improved error message extraction
     if (!response.ok) {

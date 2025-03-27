@@ -8,6 +8,8 @@ import { saveAs } from "file-saver"
 import * as XLSX from "xlsx"
 import { apiClient, handleApiError } from "@/lib/api-client"
 import { useAuth } from "@/contexts/auth-context"
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { PieChart, Pie, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell } from "recharts"
 
 interface AdminData {
   totalUsers: number
@@ -19,7 +21,13 @@ interface AdminData {
   bookingsToday: number
   pendingBookings: number
   completedBookings: number
+  usersByRole?: { role: string; _count: number }[]
+  servicesByCategory?: { category: string; count: number }[]
+  bookingsByStatus?: { status: string; _count: number }[]
 }
+
+// Chart colors
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d'];
 
 const AdminDashboard = () => {
   const { token } = useAuth()
@@ -85,8 +93,24 @@ const AdminDashboard = () => {
     saveAs(blob, "admin_report.xlsx")
   }
 
+  // Prepare chart data
+  const usersByRoleData = adminData.usersByRole?.map((item) => ({
+    name: item.role,
+    value: item._count
+  })) || [];
+
+  const servicesByCategoryData = adminData.servicesByCategory?.map((item) => ({
+    name: item.category,
+    value: item.count
+  })) || [];
+
+  const bookingsByStatusData = adminData.bookingsByStatus?.map((item) => ({
+    name: item.status,
+    value: item._count
+  })) || [];
+
   return (
-    <div className="container mx-auto py-10">
+    <div className="container mx-auto py-10 space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl">Admin Dashboard</CardTitle>
@@ -100,10 +124,10 @@ const AdminDashboard = () => {
             <CardContent className="space-y-1">
               <div className="flex items-center">
                 <Users className="h-8 w-8 text-primary mr-2" />
-                <div className="text-2xl font-bold">{isLoading ? "..." : adminData.totalUsers}</div>
+                <div className="text-2xl font-bold">{isLoading ? "..." : adminData.totalUsers || 0}</div>
               </div>
               <p className="text-xs text-muted-foreground">
-                {isLoading ? "Loading..." : `+${adminData.newUsersToday} today`}
+                {isLoading ? "Loading..." : `+${adminData.newUsersToday || 0} today`}
               </p>
             </CardContent>
           </Card>
@@ -114,10 +138,10 @@ const AdminDashboard = () => {
             <CardContent className="space-y-1">
               <div className="flex items-center">
                 <ShoppingBag className="h-8 w-8 text-primary mr-2" />
-                <div className="text-2xl font-bold">{isLoading ? "..." : adminData.totalServices}</div>
+                <div className="text-2xl font-bold">{isLoading ? "..." : adminData.totalServices || 0}</div>
               </div>
               <p className="text-xs text-muted-foreground">
-                {isLoading ? "Loading..." : `+${adminData.newServicesToday} today`}
+                {isLoading ? "Loading..." : `+${adminData.newServicesToday || 0} today`}
               </p>
             </CardContent>
           </Card>
@@ -128,10 +152,10 @@ const AdminDashboard = () => {
             <CardContent className="space-y-1">
               <div className="flex items-center">
                 <Calendar className="h-8 w-8 text-primary mr-2" />
-                <div className="text-2xl font-bold">{isLoading ? "..." : adminData.totalBookings}</div>
+                <div className="text-2xl font-bold">{isLoading ? "..." : adminData.totalBookings || 0}</div>
               </div>
               <p className="text-xs text-muted-foreground">
-                {isLoading ? "Loading..." : `${adminData.pendingBookings} pending`}
+                {isLoading ? "Loading..." : `${adminData.pendingBookings || 0} pending`}
               </p>
             </CardContent>
           </Card>
@@ -143,7 +167,7 @@ const AdminDashboard = () => {
               <div className="flex items-center">
                 <DollarSign className="h-8 w-8 text-primary mr-2" />
                 <div className="text-2xl font-bold">
-                  {isLoading ? "..." : `KSh ${adminData.totalEarnings.toLocaleString()}`}
+                  {isLoading ? "..." : `KSh ${(adminData.totalEarnings || 0).toLocaleString()}`}
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">Platform revenue</p>
@@ -157,6 +181,125 @@ const AdminDashboard = () => {
           </Button>
         </CardFooter>
       </Card>
+
+      {/* Charts Section */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* Users by Role Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Users by Role</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex items-center justify-center h-64">Loading...</div>
+            ) : usersByRoleData.length > 0 ? (
+              <ChartContainer
+                config={{
+                  users: { label: "Users" },
+                }}
+                className="h-64"
+              >
+                <PieChart>
+                  <Pie
+                    data={usersByRoleData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                    nameKey="name"
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {usersByRoleData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<ChartTooltipContent />} />
+                  <Legend />
+                </PieChart>
+              </ChartContainer>
+            ) : (
+              <div className="flex items-center justify-center h-64">No data available</div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Services by Category Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Services by Category</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex items-center justify-center h-64">Loading...</div>
+            ) : servicesByCategoryData.length > 0 ? (
+              <ChartContainer
+                config={{
+                  services: { label: "Services" },
+                }}
+                className="h-64"
+              >
+                <BarChart data={servicesByCategoryData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip content={<ChartTooltipContent />} />
+                  <Legend />
+                  <Bar dataKey="value" fill="#8884d8">
+                    {servicesByCategoryData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ChartContainer>
+            ) : (
+              <div className="flex items-center justify-center h-64">No data available</div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Bookings by Status Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Bookings by Status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex items-center justify-center h-64">Loading...</div>
+            ) : bookingsByStatusData.length > 0 ? (
+              <ChartContainer
+                config={{
+                  bookings: { label: "Bookings" },
+                }}
+                className="h-64"
+              >
+                <PieChart>
+                  <Pie
+                    data={bookingsByStatusData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                    nameKey="name"
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {bookingsByStatusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<ChartTooltipContent />} />
+                  <Legend />
+                </PieChart>
+              </ChartContainer>
+            ) : (
+              <div className="flex items-center justify-center h-64">No data available</div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

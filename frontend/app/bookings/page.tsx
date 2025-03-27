@@ -73,7 +73,7 @@ export default function BookingsPage() {
     try {
       setIsCancelling(true)
 
-      await bookingService.cancelBooking(cancelBookingId, token)
+      await bookingService.cancelBooking(cancelBookingId, token, cancelReason)
 
       // Update the booking status in the UI
       setBookings(
