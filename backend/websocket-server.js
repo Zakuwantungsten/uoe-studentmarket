@@ -192,7 +192,7 @@ function handleTypingIndicator(ws, data) {
 
 // Start WebSocket server
 const PORT = process.env.WS_PORT || 5001
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`WebSocket server running on port ${PORT}`)
+  console.log(`MongoDB connection state: ${mongoose.connection.readyState}`)
 })
-
