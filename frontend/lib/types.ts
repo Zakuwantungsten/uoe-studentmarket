@@ -66,6 +66,7 @@ export interface Category {
   icon?: string
   description?: string
   count?: number
+  serviceCount?: number
   createdAt: string
   updatedAt: string
 }

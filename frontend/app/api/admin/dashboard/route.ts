@@ -1,15 +1,33 @@
 import { NextResponse } from "next/server"
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 
 // GET admin dashboard stats
 export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions)
+    // Get token from Authorization header
+    const authHeader = req.headers.get("Authorization")
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
-    // Check if user is authenticated and is an admin
-    if (!session || session.user.role !== "ADMIN") {
+    const token = authHeader.split(" ")[1]
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    // Verify token and get user (this is a simplified version, you might need to implement proper token verification)
+    // For now, we'll just check if the user exists and is an admin
+    const user = await prisma.user.findFirst({
+      where: {
+        sessions: {
+          some: {
+            sessionToken: token,
+          },
+        },
+      },
+    })
+
+    if (!user || user.role !== "ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
 
@@ -85,15 +103,20 @@ export async function GET(req: Request) {
     })
 
     // Get category names
+    type Category = {
+      id: string;
+      name: string;
+    };
+    
     const categories = await prisma.category.findMany({
       select: {
         id: true,
         name: true,
       },
-    })
+    }) as Category[];
 
     // Map category IDs to names
-    const categoryMap = categories.reduce((acc, cat) => {
+    const categoryMap = categories.reduce((acc: Record<string, string>, cat: Category) => {
       acc[cat.id] = cat.name
       return acc
     }, {})
@@ -152,13 +175,64 @@ export async function GET(req: Request) {
       take: 5,
     })
 
+    // Get new users today
+    const newUsersToday = await prisma.user.count({
+      where: {
+        createdAt: {
+          gte: new Date(new Date().setHours(0, 0, 0, 0))
+        }
+      }
+    });
+
+    // Get new services today
+    const newServicesToday = await prisma.service.count({
+      where: {
+        createdAt: {
+          gte: new Date(new Date().setHours(0, 0, 0, 0))
+        }
+      }
+    });
+
+    // Get bookings today
+    const bookingsToday = await prisma.booking.count({
+      where: {
+        createdAt: {
+          gte: new Date(new Date().setHours(0, 0, 0, 0))
+        }
+      }
+    });
+
+    // Get pending bookings
+    const pendingBookings = await prisma.booking.count({
+      where: {
+        status: "PENDING"
+      }
+    });
+
+    // Get completed bookings
+    const completedBookings = await prisma.booking.count({
+      where: {
+        status: "COMPLETED"
+      }
+    });
+
+    // Format response to match what the frontend expects
     return NextResponse.json({
-      totalUsers,
-      totalServices,
-      totalBookings,
-      totalEarnings: totalEarnings._sum.amount || 0,
+      success: true,
+      data: {
+        totalUsers,
+        totalServices,
+        totalBookings,
+        totalEarnings: Number(totalEarnings._sum.amount || 0),
+        newUsersToday,
+        newServicesToday,
+        bookingsToday,
+        pendingBookings,
+        completedBookings
+      },
+      // Include additional data for other dashboard components
       usersByRole,
-      servicesByCategory: servicesByCategory.map((item) => ({
+      servicesByCategory: servicesByCategory.map((item: { categoryId: string; _count: number }) => ({
         category: categoryMap[item.categoryId] || item.categoryId,
         count: item._count,
       })),

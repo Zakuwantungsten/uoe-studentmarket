@@ -7,13 +7,30 @@ import { z } from "zod"
 // GET all categories
 export async function GET(req: Request) {
   try {
+    // Fetch all categories
     const categories = await prisma.category.findMany({
       orderBy: {
         name: "asc",
       },
     })
 
-    return NextResponse.json(categories)
+    // Fetch service counts for each category
+    const categoriesWithCounts = await Promise.all(
+      categories.map(async (category: any) => {
+        const serviceCount = await prisma.service.count({
+          where: {
+            categoryId: category.id,
+          },
+        })
+        
+        return {
+          ...category,
+          serviceCount,
+        }
+      })
+    )
+
+    return NextResponse.json(categoriesWithCounts)
   } catch (error) {
     console.error("Error fetching categories:", error)
     return NextResponse.json({ error: "An error occurred while fetching categories" }, { status: 500 })
@@ -34,7 +51,7 @@ export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
 
     // Check if user is authenticated and is an admin
-    if (!session || session.user.role !== "ADMIN") {
+    if (!session || !session.user || (session.user as any).role !== "ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
 

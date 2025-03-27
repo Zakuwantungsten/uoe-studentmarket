@@ -202,7 +202,7 @@ export default function ServiceDetailsPage() {
                 </ul>
               </TabsContent>
               <TabsContent value="reviews" className="mt-4">
-                <Reviews serviceId={service._id} initialReviews={reviews} />
+                <Reviews service={service} />
               </TabsContent>
             </Tabs>
           </div>
@@ -213,9 +213,26 @@ export default function ServiceDetailsPage() {
           <Card>
             <CardContent className="p-6">
               <div className="space-y-4">
-                <div className="flex items-baseline justify-between">
-                  <span className="text-3xl font-bold">KSh {service.price}</span>
-                  {service.priceType && <span className="text-sm text-muted-foreground">{service.priceType}</span>}
+                <div>
+                  {service.discount ? (
+                    <>
+                      <div className="flex items-baseline">
+                        <span className="text-3xl font-bold text-destructive">
+                          KSh {(service.price - (service.price * service.discount / 100)).toFixed(0)}
+                        </span>
+                        {service.priceType && <span className="text-sm text-muted-foreground ml-2">{service.priceType}</span>}
+                      </div>
+                      <div className="flex items-center mt-1">
+                        <span className="text-muted-foreground line-through mr-2">KSh {service.price}</span>
+                        <span className="text-sm text-destructive font-medium">Save {service.discount}%</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-3xl font-bold">KSh {service.price}</span>
+                      {service.priceType && <span className="text-sm text-muted-foreground">{service.priceType}</span>}
+                    </div>
+                  )}
                 </div>
                 {service.discount && (
                   <div className="rounded-md bg-red-50 p-2 text-red-700">
@@ -251,7 +268,7 @@ export default function ServiceDetailsPage() {
                     <div className="flex items-center text-sm text-muted-foreground">
                       <Star className="mr-1 h-3 w-3 fill-amber-500 text-amber-500" />
                       <span>
-                        {service.provider?.rating || 0} ({service.provider?.totalReviews || 0})
+                        {service.provider?.rating || 0} ({service.provider?.reviewCount || 0})
                       </span>
                     </div>
                   </div>

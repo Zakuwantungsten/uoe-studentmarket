@@ -159,8 +159,14 @@ export default function Home() {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mt-8">
-              {categories.slice(0, 6).map((category) => (
-                <CategoryCard key={category._id} category={category} />
+              {categories.map((category) => (
+                <CategoryCard 
+                  key={category._id} 
+                  category={{
+                    ...category,
+                    count: category.serviceCount || 0
+                  }} 
+                />
               ))}
             </div>
           )}

@@ -43,7 +43,14 @@ const AdminDashboard = () => {
       try {
         setIsLoading(true)
         const response = await apiClient.get<{ success: boolean; data: AdminData }>("/admin/dashboard", { token })
-        setAdminData(response.data)
+        
+        // Check if response has the expected structure
+        if (response.success && response.data) {
+          setAdminData(response.data)
+        } else {
+          console.error("Unexpected API response structure:", response)
+          handleApiError(new Error("Unexpected API response structure"), "Failed to load admin dashboard data")
+        }
       } catch (error) {
         handleApiError(error, "Failed to load admin dashboard data")
       } finally {

@@ -28,6 +28,9 @@ export default function ServiceCard({ service, featured = false }: ServiceCardPr
     discount,
   } = service
 
+  // Calculate discounted price if discount is available
+  const discountedPrice = discount ? price - (price * discount / 100) : null;
+
   return (
     <Card className={`overflow-hidden transition-all hover:shadow-md ${featured ? "border-primary/50" : ""}`}>
       <div className="relative">
@@ -79,7 +82,14 @@ export default function ServiceCard({ service, featured = false }: ServiceCardPr
       </CardContent>
       <CardFooter className="p-4 flex justify-between items-center">
         <div className="font-bold">
-          KSh {price}
+          {discount ? (
+            <>
+              <span className="text-destructive">KSh {discountedPrice?.toFixed(0)}</span>
+              <span className="text-muted-foreground line-through text-sm ml-2">KSh {price}</span>
+            </>
+          ) : (
+            <>KSh {price}</>
+          )}
           {service.priceType && (
             <span className="text-xs text-muted-foreground font-normal ml-1">{service.priceType}</span>
           )}

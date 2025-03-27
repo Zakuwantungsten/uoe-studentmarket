@@ -37,6 +37,7 @@ export default function OfferServicePage() {
     features: string[];
     image: string;
     featured: boolean;
+    discount: string;
   }
   
   interface FormErrors {
@@ -56,6 +57,7 @@ export default function OfferServicePage() {
     features: [],
     image: "",
     featured: false,
+    discount: "",
   })
   
   const [customCategory, setCustomCategory] = useState("")
@@ -174,6 +176,7 @@ export default function OfferServicePage() {
         location: finalLocation,
         image: imageUrl,
         price: Number.parseFloat(formData.price),
+        discount: formData.discount ? Number.parseInt(formData.discount) : undefined,
       }
 
       await serviceService.createService(serviceData, token as string)
@@ -265,7 +268,7 @@ export default function OfferServicePage() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="price">Price (KSh)</Label>
                     <Input
@@ -277,6 +280,22 @@ export default function OfferServicePage() {
                       onChange={handleChange}
                     />
                     {errors.price && <p className="text-xs text-red-500">{errors.price}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="discount">Discount (%)</Label>
+                    <Input
+                      id="discount"
+                      name="discount"
+                      type="number"
+                      min="0"
+                      max="100"
+                      placeholder="e.g., 10"
+                      value={formData.discount}
+                      onChange={handleChange}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Enter percentage discount (0-100)
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="price-type">Price Type</Label>

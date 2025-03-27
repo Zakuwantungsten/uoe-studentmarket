@@ -48,7 +48,13 @@ export default function DashboardPage() {
           token,
         })
 
-        setStats(response.data)
+        // Check if response has the expected structure
+        if (response.success && response.data) {
+          setStats(response.data)
+        } else {
+          console.error("Unexpected API response structure:", response)
+          handleApiError(new Error("Unexpected API response structure"), "Failed to load dashboard data")
+        }
       } catch (error) {
         handleApiError(error, "Failed to load dashboard data")
       } finally {
