@@ -343,3 +343,36 @@ exports.getServiceProviders = async (req, res) => {
   }
 }
 
+// === ADD THIS NEW METHOD AT THE BOTTOM OF THE FILE ===
+exports.getRecentActivities = async (req, res) => {
+  try {
+    const recentBookings = await Booking.find({
+      $or: [{ customer: req.user.id }, { provider: req.user.id }]
+    })
+      .sort("-createdAt")
+      .limit(5)
+      .populate("service", "title")
+      .populate("customer", "name")
+      .populate("provider", "name");
+
+    const recentServices = await Service.find({ provider: req.user.id })
+      .sort("-createdAt")
+      .limit(5);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        bookings: recentBookings,
+        services: recentServices,
+        // Add other activity types if needed
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch recent activities",
+      error: error.message
+    });
+  }
+};
+// === END OF NEW METHOD ===

@@ -51,9 +51,13 @@ async function fetchApi<T>(endpoint: string, options: FetchOptions = {}): Promis
     // Parse the JSON response
     const data = await response.json()
 
-    // Handle API errors
+    // Handle API errors with improved error message extraction
     if (!response.ok) {
-      throw new ApiError(data.message || "Something went wrong", response.status, data)
+      const errorMessage = data?.message || 
+                          (data?.error?.message) || 
+                          (typeof data === 'string' ? data : "Something went wrong")
+      console.error(`API Error (${response.status}):`, errorMessage, data)
+      throw new ApiError(errorMessage, response.status, data)
     }
 
     return data

@@ -7,13 +7,53 @@ interface LoginResponse {
 }
 
 export const authService = {
-  register: (data: {
+  register: async (data: {
     name: string
     email: string
     password: string
     role: "USER" | "PROVIDER" // Updated to match Prisma enum
     studentId?: string
-  }) => apiClient.post<ApiResponse<LoginResponse>>("/auth/register", data),
+  }) => {
+    try {
+      const response = await apiClient.post<any>("/auth/register", data)
+      
+      console.log('Raw register response:', response)
+      
+      // Handle different response structures
+      // Backend register endpoint returns { user, token } directly
+      // while login endpoint returns { success, data: { user, token }, message }
+      
+      // If response already has the expected structure with data property
+      if (response.data && response.data.user && response.data.token) {
+        console.log('Registration successful (data format):', response.data.user.email)
+        return {
+          success: true,
+          data: response.data,
+          message: "Registration successful"
+        }
+      }
+      
+      // If response has user and token directly at the top level (backend register format)
+      if (response.user && response.token) {
+        console.log('Registration successful (direct format):', response.user.email)
+        return {
+          success: true,
+          data: {
+            user: response.user,
+            token: response.token
+          },
+          message: "Registration successful"
+        }
+      }
+      
+      // If we get here, the response doesn't have the expected structure
+      console.error('Invalid register response format:', response)
+      throw new Error('Invalid response format from server')
+    } catch (error) {
+      console.error('Registration service error:', error)
+      throw error
+    }
+  },
 
   login: async (data: {
     email: string

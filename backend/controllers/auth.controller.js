@@ -25,6 +25,7 @@ exports.register = async (req, res, next) => {
       email,
       password,
       studentId,
+      role: req.body.role || "USER", // Add role field with default value
     })
 
     // Generate token
@@ -34,11 +35,20 @@ exports.register = async (req, res, next) => {
     user.password = undefined
 
     res.status(201).json({
-      user,
-      token,
+      success: true,
+      data: {
+        user,
+        token
+      },
+      message: "Registration successful"
     })
   } catch (error) {
-    next(error)
+    console.error('Registration error:', error)
+    res.status(500).json({
+      success: false,
+      message: "Server error during registration",
+      error: error.message
+    })
   }
 }
 

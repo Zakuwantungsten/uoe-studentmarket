@@ -23,6 +23,14 @@ export interface User {
     current: boolean
     description?: string
   }[]
+  certifications?: {
+    name: string
+    organization: string
+    issueDate: Date
+    expiryDate?: Date
+    credentialId?: string
+    credentialUrl?: string
+  }[]
   socialMedia?: {
     twitter?: string
     facebook?: string

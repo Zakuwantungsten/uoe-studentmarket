@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, FormEvent, ChangeEvent } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Upload } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,14 +17,34 @@ import DashboardLayout from "@/components/dashboard-layout"
 import { useAuth } from "@/contexts/auth-context"
 import { categoryService } from "@/lib/services/category-service"
 import { serviceService } from "@/lib/services/service-service"
+import { apiClient } from "@/lib/api-client"
+import { Category, ApiResponse } from "@/lib/types"
 
 export default function OfferServicePage() {
-  const { user } = useAuth()
+  const { user, token } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
-  const [categories, setCategories] = useState([])
-  const [formData, setFormData] = useState({
+  interface FormData {
+    title: string;
+    description: string;
+    price: string;
+    priceType: string;
+    location: string;
+    categoryId: string;
+    availability: string;
+    deliveryTime: string;
+    features: string[];
+    image: string;
+    featured: boolean;
+  }
+  
+  interface FormErrors {
+    [key: string]: string;
+  }
+  
+  const [categories, setCategories] = useState<Category[]>([])
+  const [formData, setFormData] = useState<FormData>({
     title: "",
     description: "",
     price: "",
@@ -37,7 +57,13 @@ export default function OfferServicePage() {
     image: "",
     featured: false,
   })
-  const [errors, setErrors] = useState({})
+  
+  const [customCategory, setCustomCategory] = useState("")
+  const [customLocation, setCustomLocation] = useState("")
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [errors, setErrors] = useState<FormErrors>({})
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -57,22 +83,23 @@ export default function OfferServicePage() {
     fetchCategories()
   }, [toast])
 
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target
+  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target
+    const checked = (e.target as HTMLInputElement).checked
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }))
   }
 
-  const handleSelectChange = (name, value) => {
+  const handleSelectChange = (name: string, value: string | boolean) => {
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }))
   }
 
-  const handleFeatureChange = (feature, checked) => {
+  const handleFeatureChange = (feature: string, checked: boolean) => {
     setFormData((prev) => ({
       ...prev,
       features: checked ? [...prev.features, feature] : prev.features.filter((f) => f !== feature),
@@ -80,7 +107,7 @@ export default function OfferServicePage() {
   }
 
   const validateForm = () => {
-    const newErrors = {}
+    const newErrors: FormErrors = {}
     if (!formData.title) newErrors.title = "Title is required"
     if (!formData.description) newErrors.description = "Description is required"
     if (!formData.price) newErrors.price = "Price is required"
@@ -91,21 +118,65 @@ export default function OfferServicePage() {
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = async (e) => {
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Preview the image
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+    
+    setImageFile(file)
+  }
+  
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
     if (!validateForm()) return
 
     try {
       setLoading(true)
+      
+      // Handle custom category if "Other" is selected
+      let finalDescription = formData.description
+      if (formData.categoryId === "other" && customCategory.trim()) {
+        finalDescription = `${finalDescription}\n\nCustom Category: ${customCategory.trim()}`
+      }
+      
+      // Handle custom location
+      let finalLocation = formData.location
+      if (formData.location === "Other" && customLocation.trim()) {
+        finalLocation = customLocation.trim()
+      }
+      
+      // Upload image if selected
+      let imageUrl = formData.image
+      if (imageFile) {
+        const formData = new FormData()
+        formData.append("file", imageFile)
+        
+        const response = await apiClient.upload("/upload/file", formData) as { 
+          success: boolean; 
+          data: { url: string } 
+        }
+        if (response?.success && response?.data?.url) {
+          imageUrl = response.data.url
+        }
+      }
 
       // Format data for API
       const serviceData = {
         ...formData,
+        description: finalDescription,
+        location: finalLocation,
+        image: imageUrl,
         price: Number.parseFloat(formData.price),
       }
 
-      await serviceService.createService(serviceData)
+      await serviceService.createService(serviceData, token as string)
 
       toast({
         title: "Success",
@@ -113,11 +184,11 @@ export default function OfferServicePage() {
       })
 
       router.push("/my-services")
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating service:", error)
       toast({
         title: "Error",
-        description: error.response?.data?.error || "Failed to create service. Please try again.",
+        description: error?.response?.data?.error || "Failed to create service. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -172,13 +243,26 @@ export default function OfferServicePage() {
                     </SelectTrigger>
                     <SelectContent>
                       {categories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
+                        <SelectItem key={category._id} value={category._id}>
                           {category.name}
                         </SelectItem>
                       ))}
+                      <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>
                   {errors.categoryId && <p className="text-xs text-red-500">{errors.categoryId}</p>}
+                  
+                  {formData.categoryId === "other" && (
+                    <div className="mt-2">
+                      <Label htmlFor="customCategory">Specify Category</Label>
+                      <Input
+                        id="customCategory"
+                        value={customCategory}
+                        onChange={(e) => setCustomCategory(e.target.value)}
+                        placeholder="Enter custom category"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -239,7 +323,7 @@ export default function OfferServicePage() {
                       <Checkbox
                         id="feature1"
                         checked={formData.features.includes("One-on-one sessions")}
-                        onCheckedChange={(checked) => handleFeatureChange("One-on-one sessions", checked)}
+                        onCheckedChange={(checked) => handleFeatureChange("One-on-one sessions", !!checked)}
                       />
                       <Label htmlFor="feature1" className="text-sm font-normal">
                         One-on-one sessions
@@ -249,7 +333,7 @@ export default function OfferServicePage() {
                       <Checkbox
                         id="feature2"
                         checked={formData.features.includes("Group sessions available")}
-                        onCheckedChange={(checked) => handleFeatureChange("Group sessions available", checked)}
+                        onCheckedChange={(checked) => handleFeatureChange("Group sessions available", !!checked)}
                       />
                       <Label htmlFor="feature2" className="text-sm font-normal">
                         Group sessions available
@@ -259,7 +343,7 @@ export default function OfferServicePage() {
                       <Checkbox
                         id="feature3"
                         checked={formData.features.includes("Online sessions")}
-                        onCheckedChange={(checked) => handleFeatureChange("Online sessions", checked)}
+                        onCheckedChange={(checked) => handleFeatureChange("Online sessions", !!checked)}
                       />
                       <Label htmlFor="feature3" className="text-sm font-normal">
                         Online sessions
@@ -269,7 +353,7 @@ export default function OfferServicePage() {
                       <Checkbox
                         id="feature4"
                         checked={formData.features.includes("In-person sessions")}
-                        onCheckedChange={(checked) => handleFeatureChange("In-person sessions", checked)}
+                        onCheckedChange={(checked) => handleFeatureChange("In-person sessions", !!checked)}
                       />
                       <Label htmlFor="feature4" className="text-sm font-normal">
                         In-person sessions
@@ -279,7 +363,7 @@ export default function OfferServicePage() {
                       <Checkbox
                         id="feature5"
                         checked={formData.features.includes("Flexible scheduling")}
-                        onCheckedChange={(checked) => handleFeatureChange("Flexible scheduling", checked)}
+                        onCheckedChange={(checked) => handleFeatureChange("Flexible scheduling", !!checked)}
                       />
                       <Label htmlFor="feature5" className="text-sm font-normal">
                         Flexible scheduling
@@ -289,7 +373,7 @@ export default function OfferServicePage() {
                       <Checkbox
                         id="feature6"
                         checked={formData.features.includes("Materials provided")}
-                        onCheckedChange={(checked) => handleFeatureChange("Materials provided", checked)}
+                        onCheckedChange={(checked) => handleFeatureChange("Materials provided", !!checked)}
                       />
                       <Label htmlFor="feature6" className="text-sm font-normal">
                         Materials provided
@@ -315,9 +399,22 @@ export default function OfferServicePage() {
                       <SelectItem value="Dorms">Dorms</SelectItem>
                       <SelectItem value="Library">Library</SelectItem>
                       <SelectItem value="Campus Wide">Campus Wide</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
                     </SelectContent>
                   </Select>
                   {errors.location && <p className="text-xs text-red-500">{errors.location}</p>}
+                  
+                  {formData.location === "Other" && (
+                    <div className="mt-2">
+                      <Label htmlFor="customLocation">Specify Location</Label>
+                      <Input
+                        id="customLocation"
+                        value={customLocation}
+                        onChange={(e) => setCustomLocation(e.target.value)}
+                        placeholder="Enter custom location"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -343,15 +440,43 @@ export default function OfferServicePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="image">Service Image URL (optional)</Label>
-                  <Input
-                    id="image"
-                    name="image"
-                    value={formData.image}
-                    onChange={handleChange}
-                    placeholder="https://example.com/image.jpg"
-                  />
-                  <p className="text-xs text-muted-foreground">Enter a URL for an image that represents your service</p>
+                  <Label htmlFor="image">Service Image</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="image"
+                      name="image"
+                      type="file"
+                      accept="image/*"
+                      ref={fileInputRef}
+                      onChange={handleImageChange}
+                      className="hidden"
+                    />
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-2"
+                    >
+                      <Upload className="h-4 w-4" />
+                      Upload Image
+                    </Button>
+                    {formData.image && !imagePreview && (
+                      <span className="text-sm text-muted-foreground">Current image: {formData.image}</span>
+                    )}
+                  </div>
+                  
+                  {imagePreview && (
+                    <div className="mt-2">
+                      <p className="text-sm mb-2">Image Preview:</p>
+                      <img 
+                        src={imagePreview} 
+                        alt="Preview" 
+                        className="max-w-full h-auto max-h-48 rounded-md border" 
+                      />
+                    </div>
+                  )}
+                  
+                  <p className="text-xs text-muted-foreground">Upload an image that represents your service</p>
                 </div>
 
                 <div className="flex items-center space-x-2">
@@ -359,7 +484,7 @@ export default function OfferServicePage() {
                     id="featured"
                     name="featured"
                     checked={formData.featured}
-                    onCheckedChange={(checked) => handleSelectChange("featured", checked)}
+                    onCheckedChange={(checked) => handleSelectChange("featured", !!checked)}
                   />
                   <Label htmlFor="featured">Promote as featured service (additional fee applies)</Label>
                 </div>

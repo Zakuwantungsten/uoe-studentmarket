@@ -36,7 +36,7 @@ export default function ProfilePage() {
         setIsLoading(true)
 
         // Fetch user's services if they are a provider
-        if (user?.role === "provider") {
+        if (user?.role === "PROVIDER") {
           const servicesResponse = await serviceService.getMyServices(token)
           setServices(servicesResponse.data)
         }
@@ -99,27 +99,28 @@ export default function ProfilePage() {
                 </Avatar>
                 <div className="text-center md:text-left">
                   <h1 className="text-2xl font-bold">{user.name}</h1>
-                  <p className="text-muted-foreground">{user.role === "provider" ? "Service Provider" : "Customer"}</p>
+                  <p className="text-muted-foreground">{user.role === "PROVIDER" ? "Service Provider" : "Customer"}</p>
                 </div>
               </div>
               <div className="flex-1 space-y-4">
                 <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-                  {user.badges?.map((badge, index) => (
+                  {/* Skills badges */}
+                  {user.skills && user.skills.length > 0 && user.skills.map((skill: string, index: number) => (
                     <Badge key={index} variant="secondary">
-                      {badge}
+                      {skill}
                     </Badge>
                   ))}
-                  {user.role === "provider" && (
+                  {user.role === "PROVIDER" && (
                     <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
                       <Star className="mr-1 h-3 w-3 fill-current" />
-                      {user.rating || 0} ({user.totalReviews || 0} reviews)
+                      {user.rating || 0} ({user.reviewCount || 0} reviews)
                     </Badge>
                   )}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="flex items-center text-sm text-muted-foreground">
                     <MapPin className="mr-2 h-4 w-4" />
-                    <span>{user.location || "Location not specified"}</span>
+                    <span>{user.address || "Location not specified"}</span>
                   </div>
                   <div className="flex items-center text-sm text-muted-foreground">
                     <Mail className="mr-2 h-4 w-4" />
@@ -156,32 +157,93 @@ export default function ProfilePage() {
             <p className="text-muted-foreground whitespace-pre-line">
               {user.bio || "No bio information provided yet."}
             </p>
-            {user.role === "provider" && (
-              <>
-                <Separator className="my-4" />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h3 className="font-medium mb-2">Education</h3>
-                    <p className="text-muted-foreground">{user.education || "No education information provided."}</p>
-                  </div>
-                  <div>
-                    <h3 className="font-medium mb-2">Experience</h3>
-                    <p className="text-muted-foreground">{user.experience || "No experience information provided."}</p>
-                  </div>
-                </div>
-              </>
-            )}
+                {/* Skills Section */}
+                {user.skills && user.skills.length > 0 && (
+                  <>
+                    <Separator className="my-4" />
+                    <div>
+                      <h3 className="font-medium mb-2">Skills</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {user.skills.map((skill: string, index: number) => (
+                          <Badge key={index} variant="secondary">
+                            {skill}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Education Section */}
+                {user.education && user.education.length > 0 && (
+                  <>
+                    <Separator className="my-4" />
+                    <div>
+                      <h3 className="font-medium mb-2">Education</h3>
+                      <div className="space-y-3">
+                        {user.education.map((edu, index) => (
+                          <div key={index} className="border-l-2 border-muted pl-4">
+                            <div className="font-medium">{edu.institution}</div>
+                            <div>{edu.degree} in {edu.field}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {new Date(edu.from).toLocaleDateString()} - 
+                              {edu.current ? ' Present' : edu.to ? ` ${new Date(edu.to).toLocaleDateString()}` : ''}
+                            </div>
+                            {edu.description && <p className="text-sm mt-1">{edu.description}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Certifications Section */}
+                {user.certifications && user.certifications.length > 0 && (
+                  <>
+                    <Separator className="my-4" />
+                    <div>
+                      <h3 className="font-medium mb-2">Certifications</h3>
+                      <div className="space-y-3">
+                        {user.certifications.map((cert, index) => (
+                          <div key={index} className="border-l-2 border-muted pl-4">
+                            <div className="font-medium">{cert.name}</div>
+                            <div className="text-sm">Issued by {cert.organization}</div>
+                            <div className="text-sm text-muted-foreground">
+                              Issued: {new Date(cert.issueDate).toLocaleDateString()}
+                              {cert.expiryDate && ` - Expires: ${new Date(cert.expiryDate).toLocaleDateString()}`}
+                            </div>
+                            {cert.credentialId && (
+                              <div className="text-sm">Credential ID: {cert.credentialId}</div>
+                            )}
+                            {cert.credentialUrl && (
+                              <div className="text-sm">
+                                <a 
+                                  href={cert.credentialUrl} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline"
+                                >
+                                  View Credential
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
           </CardContent>
         </Card>
 
         {/* Tabs Section */}
-        <Tabs defaultValue={user.role === "provider" ? "services" : "reviews"}>
+        <Tabs defaultValue={user.role === "PROVIDER" ? "services" : "reviews"}>
           <TabsList>
-            {user.role === "provider" && <TabsTrigger value="services">My Services</TabsTrigger>}
+            {user.role === "PROVIDER" && <TabsTrigger value="services">My Services</TabsTrigger>}
             <TabsTrigger value="reviews">Reviews</TabsTrigger>
           </TabsList>
 
-          {user.role === "provider" && (
+          {user.role === "PROVIDER" && (
             <TabsContent value="services" className="mt-6">
               {services.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -249,4 +311,3 @@ export default function ProfilePage() {
     </div>
   )
 }
-

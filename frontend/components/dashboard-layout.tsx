@@ -25,6 +25,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { useState, useEffect } from "react"
 import { useMobile } from "@/hooks/use-mobile"
+import { useAuth } from "@/contexts/auth-context"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -34,7 +35,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
   const isMobile = useMobile()
   const [isOpen, setIsOpen] = useState(false)
-  const [isAdmin, setIsAdmin] = useState(true) // This would be determined by user role in a real app
+  const { user } = useAuth()
+  const isAdmin = user?.role === "ADMIN"
 
   useEffect(() => {
     setIsOpen(false)

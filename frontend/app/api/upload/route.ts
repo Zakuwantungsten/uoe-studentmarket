@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
+import { cookies } from "next/headers"
 
 export async function POST(req: Request) {
   try {
@@ -29,12 +30,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "File too large (max 5MB)" }, { status: 400 })
     }
 
+    // For now, we'll just generate a mock URL since we don't have access to the token
     // In a real implementation, you would upload to a storage service
-    // For now, we'll just return a mock URL
     const fileName = `${Date.now()}-${file.name}`
     const url = `/uploads/${fileName}`
 
-    return NextResponse.json({ url })
+    return NextResponse.json({
+      success: true,
+      data: {
+        url: url,
+        filename: fileName,
+      },
+    })
   } catch (error) {
     console.error("Error uploading file:", error)
     return NextResponse.json({ error: "An error occurred while uploading file" }, { status: 500 })

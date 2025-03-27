@@ -19,6 +19,7 @@ export default function SignupPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [studentId, setStudentId] = useState("")
   const [role, setRole] = useState<"customer" | "provider">("customer")
   const [showPassword, setShowPassword] = useState(false)
   const [errors, setErrors] = useState<{
@@ -66,7 +67,16 @@ export default function SignupPage() {
     if (!validateForm()) return
 
     try {
-      await register(name, email, password, role)
+      // Map role values to match the expected enum values in the backend
+      const mappedRole = role === "customer" ? "USER" : "PROVIDER"
+      
+      await register({
+        name,
+        email,
+        password,
+        role: mappedRole,
+        ...(studentId ? { studentId } : {}) // Only include studentId if it's not empty
+      })
     } catch (error) {
       console.error("Registration error:", error)
     }
@@ -97,6 +107,16 @@ export default function SignupPage() {
                   onChange={(e) => setEmail(e.target.value)}
                 />
                 {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="studentId">Student ID (Optional)</Label>
+                <Input
+                  id="studentId"
+                  placeholder="e.g., s1234567"
+                  value={studentId}
+                  onChange={(e) => setStudentId(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">Only required for University of Edinburgh students</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>

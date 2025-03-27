@@ -94,13 +94,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }) => {
     setIsLoading(true)
     try {
+      console.log("Registering user with data:", { ...data, password: "***" })
       const response = await authService.register(data)
       
-      if (!response.data) {
-        throw new Error(response.message || "Registration failed")
+      console.log("Registration response in context:", response)
+      
+      // Extract user and token from response, handling different possible structures
+      let userData, authToken
+      
+      // Use type assertion to handle different response structures
+      const resp = response as any
+      
+      if (resp.data && resp.data.user && resp.data.token) {
+        // Standard API response structure
+        userData = resp.data.user
+        authToken = resp.data.token
+      } else if (resp.user && resp.token) {
+        // Direct structure from backend
+        userData = resp.user
+        authToken = resp.token
+      } else {
+        console.error("Invalid registration response structure:", resp)
+        throw new Error("Invalid response structure from server")
       }
-
-      const { user: userData, token: authToken } = response.data
+      
+      if (!userData || !authToken) {
+        console.error("Missing user or token in response:", response)
+        throw new Error("Missing user or token in response")
+      }
 
       localStorage.setItem("token", authToken)
       setUser(userData)
@@ -111,8 +132,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: `Welcome to UoE Student Marketplace, ${userData.name}!`,
       })
 
-      router.push("/dashboard")
+      // Redirect newly registered users to homepage instead of dashboard
+      router.push("/")
     } catch (error: any) {
+      console.error("Registration error in context:", error)
       toast({
         title: "Registration failed",
         description: error?.message || "Please try again",
