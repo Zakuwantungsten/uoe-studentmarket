@@ -84,7 +84,7 @@ export const authService = {
     }),
 
   updateProfile: (data: Partial<User>, token: string) =>
-    apiClient.put<ApiResponse<User>>("/users/me", data, {
+    apiClient.patch<ApiResponse<User>>("/users", data, {
       headers: {
         Authorization: `Bearer ${token}`
       }

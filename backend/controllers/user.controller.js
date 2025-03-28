@@ -117,6 +117,17 @@ exports.updateUser = async (req, res) => {
       socialLinks: req.body.socialLinks,
       image: req.body.image,
     }
+    
+    // Special case: Allow users to upgrade themselves from USER to PROVIDER
+    if (req.body.role === "PROVIDER") {
+      // Get current user to check their role
+      const currentUser = await User.findById(req.user.id)
+      if (currentUser && currentUser.role === "USER") {
+        // Only allow upgrade from USER to PROVIDER, not any other role changes
+        allowedUpdates.role = "PROVIDER"
+        console.log("User role upgrade to PROVIDER initiated")
+      }
+    }
 
     // Remove undefined fields
     Object.keys(allowedUpdates).forEach((key) => allowedUpdates[key] === undefined && delete allowedUpdates[key])
@@ -265,7 +276,7 @@ exports.getServiceProviders = async (req, res) => {
     // Find users who are service providers and have services
     const providers = await User.aggregate([
       {
-        $match: { role: "provider" },
+        $match: { role: "PROVIDER" },
       },
       {
         $lookup: {
@@ -318,7 +329,7 @@ exports.getServiceProviders = async (req, res) => {
 
     // Get total count
     const total = await User.countDocuments({
-      role: "provider",
+      role: "PROVIDER",
       // Only count providers who have services
       $expr: {
         $gt: [{ $size: { $ifNull: ["$services", []] } }, 0],
