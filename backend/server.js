@@ -36,6 +36,7 @@ const messageRoutes = require("./routes/message.routes")
 const adminRoutes = require("./routes/admin.routes")
 const uploadRoutes = require("./routes/upload.routes")
 const paymentRoutes = require("./routes/payment.routes")
+const notificationRoutes = require("./routes/notification.routes")
 
 // Use routes
 app.use("/api/auth", authRoutes)
@@ -48,6 +49,7 @@ app.use("/api/messages", messageRoutes)
 app.use("/api/admin", adminRoutes)
 app.use("/api/upload", uploadRoutes)
 app.use("/api/payments", paymentRoutes)
+app.use("/api/notifications", notificationRoutes)
 
 // Root route
 app.get("/", (req, res) => {
