@@ -3,7 +3,16 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import { PrismaAdapter } from "@next-auth/prisma-adapter"
 import { compare } from "bcrypt"
 import prisma from "@/lib/prisma"
-import { User } from "@/lib/types"
+import { User as AppUser } from "@/lib/types"
+
+// Create a specific type for NextAuth users to avoid conflicts with our app's User type
+interface NextAuthUser {
+  id: string
+  name: string
+  email: string
+  role: "USER" | "PROVIDER" | "ADMIN"
+  image?: string
+}
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -23,7 +32,7 @@ export const authOptions: NextAuthOptions = {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials): Promise<User | null> {
+      async authorize(credentials): Promise<NextAuthUser | null> {
         if (!credentials?.email || !credentials?.password) {
           return null
         }
@@ -47,23 +56,27 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
+        // Return only the fields needed for NextAuth
         return {
           id: user.id,
           name: user.name,
           email: user.email,
           role: user.role,
-          // Include any other required fields from your User type
-        } as User
+          image: user.image
+        }
       },
     }),
   ],
   callbacks: {
     async jwt({ token, user }) {
+      // This is the NextAuthUser from the authorize function
       if (user) {
+        // Use a type assertion to handle the custom properties
+        const authUser = user as NextAuthUser;
         return {
           ...token,
-          id: user.id,
-          role: user.role,
+          id: authUser.id,
+          role: authUser.role,
         }
       }
       return token

@@ -2,14 +2,129 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import prisma from "@/lib/prisma"
+import { User } from "@/lib/types"
+
+// Define interfaces for session structure to match our auth setup
+interface SessionUser {
+  id: string
+  name?: string | null
+  email?: string | null
+  role?: string
+  image?: string | null
+}
+
+interface Session {
+  user: SessionUser
+}
+
+// Define interfaces for Prisma return types to help TypeScript
+interface PrismaUser {
+  id: string
+  name: string
+  email: string
+  role: string
+  status: string
+  createdAt: Date
+}
+
+interface PrismaCategory {
+  id: string
+  name: string
+}
+
+interface PrismaService {
+  id: string
+  title: string
+  price: number
+  featured: boolean
+  status: string
+  createdAt: Date
+  category: PrismaCategory
+  provider: {
+    id: string
+    name: string
+  }
+}
+
+interface PrismaBooking {
+  id: string
+  status: string
+  totalAmount: number
+  createdAt: Date
+  service: {
+    id: string
+    title: string
+    category: PrismaCategory
+  }
+}
+
+interface PrismaTransaction {
+  id: string
+  amount: number
+  paymentMethod: string
+  createdAt: Date
+  booking?: {
+    service?: {
+      category?: {
+        name: string
+      }
+    }
+  }
+}
+
+// Define accumulator types for reduce functions
+interface DateGroupedUsers {
+  [date: string]: PrismaUser[]
+}
+
+interface DateGroupedServices {
+  [date: string]: PrismaService[]
+}
+
+interface DateGroupedBookings {
+  [date: string]: PrismaBooking[]
+}
+
+interface RevenueByDate {
+  [date: string]: {
+    totalAmount: number
+    transactions: PrismaTransaction[]
+  }
+}
+
+interface RoleCount {
+  [role: string]: number
+}
+
+interface StatusCount {
+  [status: string]: number
+}
+
+interface CategoryCount {
+  [category: string]: number
+}
+
+interface PaymentMethodStats {
+  [method: string]: {
+    count: number
+    amount: number
+  }
+}
+
+interface CategoryStats {
+  [category: string]: {
+    count: number
+    amount: number
+  }
+}
 
 // GET admin reports
 export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions) as Session | null
 
     // Check if user is authenticated and is an admin
-    if (!session || session.user.role !== "ADMIN") {
+    if (!session || !session.user || session.user.role !== "ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
 
@@ -114,14 +229,14 @@ async function getUserReport(startDate: Date, endDate: Date) {
   })
 
   // Group by date
-  const usersByDate = users.reduce((acc, user) => {
+  const usersByDate = users.reduce((acc: DateGroupedUsers, user: PrismaUser) => {
     const date = user.createdAt.toISOString().split("T")[0]
     if (!acc[date]) {
       acc[date] = []
     }
     acc[date].push(user)
     return acc
-  }, {})
+  }, {} as DateGroupedUsers)
 
   // Convert to array format
   const result = Object.keys(usersByDate).map((date) => ({
@@ -133,16 +248,16 @@ async function getUserReport(startDate: Date, endDate: Date) {
   // Add summary
   const summary = {
     totalUsers: users.length,
-    byRole: users.reduce((acc, user) => {
+    byRole: users.reduce((acc: RoleCount, user: PrismaUser) => {
       const role = user.role
       acc[role] = (acc[role] || 0) + 1
       return acc
-    }, {}),
-    byStatus: users.reduce((acc, user) => {
+    }, {} as RoleCount),
+    byStatus: users.reduce((acc: StatusCount, user: PrismaUser) => {
       const status = user.status
       acc[status] = (acc[status] || 0) + 1
       return acc
-    }, {}),
+    }, {} as StatusCount),
   }
 
   return {
@@ -176,14 +291,14 @@ async function getServiceReport(startDate: Date, endDate: Date) {
   })
 
   // Group by date
-  const servicesByDate = services.reduce((acc, service) => {
+  const servicesByDate = services.reduce((acc: DateGroupedServices, service: PrismaService) => {
     const date = service.createdAt.toISOString().split("T")[0]
     if (!acc[date]) {
       acc[date] = []
     }
     acc[date].push(service)
     return acc
-  }, {})
+  }, {} as DateGroupedServices)
 
   // Convert to array format
   const result = Object.keys(servicesByDate).map((date) => ({
@@ -195,18 +310,18 @@ async function getServiceReport(startDate: Date, endDate: Date) {
   // Add summary
   const summary = {
     totalServices: services.length,
-    byCategory: services.reduce((acc, service) => {
+    byCategory: services.reduce((acc: CategoryCount, service: PrismaService) => {
       const category = service.category.name
       acc[category] = (acc[category] || 0) + 1
       return acc
-    }, {}),
-    byStatus: services.reduce((acc, service) => {
+    }, {} as CategoryCount),
+    byStatus: services.reduce((acc: StatusCount, service: PrismaService) => {
       const status = service.status
       acc[status] = (acc[status] || 0) + 1
       return acc
-    }, {}),
-    featuredCount: services.filter((s) => s.featured).length,
-    averagePrice: services.reduce((sum, service) => sum + service.price, 0) / services.length,
+    }, {} as StatusCount),
+    featuredCount: services.filter((s: PrismaService) => s.featured).length,
+    averagePrice: services.reduce((sum: number, service: PrismaService) => sum + service.price, 0) / services.length,
   }
 
   return {
@@ -252,38 +367,38 @@ async function getBookingReport(startDate: Date, endDate: Date) {
   })
 
   // Group by date
-  const bookingsByDate = bookings.reduce((acc, booking) => {
+  const bookingsByDate = bookings.reduce((acc: DateGroupedBookings, booking: PrismaBooking) => {
     const date = booking.createdAt.toISOString().split("T")[0]
     if (!acc[date]) {
       acc[date] = []
     }
     acc[date].push(booking)
     return acc
-  }, {})
+  }, {} as DateGroupedBookings)
 
   // Convert to array format
   const result = Object.keys(bookingsByDate).map((date) => ({
     date,
     count: bookingsByDate[date].length,
-    totalAmount: bookingsByDate[date].reduce((sum, booking) => sum + booking.totalAmount, 0),
+    totalAmount: bookingsByDate[date].reduce((sum: number, booking: PrismaBooking) => sum + booking.totalAmount, 0),
     bookings: bookingsByDate[date],
   }))
 
   // Add summary
   const summary = {
     totalBookings: bookings.length,
-    totalAmount: bookings.reduce((sum, booking) => sum + booking.totalAmount, 0),
-    byStatus: bookings.reduce((acc, booking) => {
+    totalAmount: bookings.reduce((sum: number, booking: PrismaBooking) => sum + booking.totalAmount, 0),
+    byStatus: bookings.reduce((acc: StatusCount, booking: PrismaBooking) => {
       const status = booking.status
       acc[status] = (acc[status] || 0) + 1
       return acc
-    }, {}),
-    byCategory: bookings.reduce((acc, booking) => {
+    }, {} as StatusCount),
+    byCategory: bookings.reduce((acc: CategoryCount, booking: PrismaBooking) => {
       const category = booking.service.category.name
       acc[category] = (acc[category] || 0) + 1
       return acc
-    }, {}),
-    completionRate: bookings.filter((b) => b.status === "COMPLETED").length / bookings.length,
+    }, {} as CategoryCount),
+    completionRate: bookings.filter((b: PrismaBooking) => b.status === "COMPLETED").length / bookings.length,
   }
 
   return {
@@ -328,7 +443,7 @@ async function getRevenueReport(startDate: Date, endDate: Date) {
   })
 
   // Group by date
-  const revenueByDate = transactions.reduce((acc, transaction) => {
+  const revenueByDate = transactions.reduce((acc: RevenueByDate, transaction: PrismaTransaction) => {
     const date = transaction.createdAt.toISOString().split("T")[0]
     if (!acc[date]) {
       acc[date] = {
@@ -339,7 +454,7 @@ async function getRevenueReport(startDate: Date, endDate: Date) {
     acc[date].totalAmount += transaction.amount
     acc[date].transactions.push(transaction)
     return acc
-  }, {})
+  }, {} as RevenueByDate)
 
   // Convert to array format
   const result = Object.keys(revenueByDate).map((date) => ({
@@ -351,11 +466,11 @@ async function getRevenueReport(startDate: Date, endDate: Date) {
 
   // Add summary
   const summary = {
-    totalRevenue: transactions.reduce((sum, t) => sum + t.amount, 0),
+    totalRevenue: transactions.reduce((sum: number, t: PrismaTransaction) => sum + t.amount, 0),
     transactionCount: transactions.length,
     averageTransactionValue:
-      transactions.length > 0 ? transactions.reduce((sum, t) => sum + t.amount, 0) / transactions.length : 0,
-    byPaymentMethod: transactions.reduce((acc, t) => {
+      transactions.length > 0 ? transactions.reduce((sum: number, t: PrismaTransaction) => sum + t.amount, 0) / transactions.length : 0,
+    byPaymentMethod: transactions.reduce((acc: PaymentMethodStats, t: PrismaTransaction) => {
       const method = t.paymentMethod
       if (!acc[method]) {
         acc[method] = {
@@ -366,8 +481,8 @@ async function getRevenueReport(startDate: Date, endDate: Date) {
       acc[method].count += 1
       acc[method].amount += t.amount
       return acc
-    }, {}),
-    byCategory: transactions.reduce((acc, t) => {
+    }, {} as PaymentMethodStats),
+    byCategory: transactions.reduce((acc: CategoryStats, t: PrismaTransaction) => {
       if (!t.booking?.service?.category) return acc
 
       const category = t.booking.service.category.name
@@ -380,7 +495,7 @@ async function getRevenueReport(startDate: Date, endDate: Date) {
       acc[category].count += 1
       acc[category].amount += t.amount
       return acc
-    }, {}),
+    }, {} as CategoryStats),
   }
 
   return {

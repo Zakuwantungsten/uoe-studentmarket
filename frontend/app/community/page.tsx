@@ -6,8 +6,11 @@ import Link from "next/link"
 import Image from "next/image"
 import { MessageSquare, Calendar, Users, ArrowRight, ThumbsUp, MessageCircle, Share2, MapPin } from "lucide-react"
 import { format } from "date-fns"
-import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import * as z from "zod"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,13 +27,8 @@ import { getAllDiscussions, createDiscussion, createComment, Discussion, Comment
 import { getAllEvents, rsvpToEvent, Event } from "@/lib/services/event-service"
 import { getAllGroups, joinGroup, leaveGroup, Group } from "@/lib/services/group-service"
 
-export const metadata = {
-  title: "Community | UoE Student Marketplace",
-  description: "Connect with the University of Eldoret student community",
-}
-
 export default function CommunityPage() {
-  const { data: session } = useSession()
+  const { user, isAuthenticated } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
   
@@ -42,9 +40,9 @@ export default function CommunityPage() {
     events: true,
     groups: true
   })
-  const [newDiscussion, setNewDiscussion] = useState("")
-  const [newDiscussionTitle, setNewDiscussionTitle] = useState("")
-  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  // State for simple discussion input
+  const [discussionInput, setDiscussionInput] = useState<string>("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [commentText, setCommentText] = useState<{[key: string]: string}>({})
 
   useEffect(() => {
@@ -107,10 +105,8 @@ export default function CommunityPage() {
     loadGroups()
   }, [toast])
 
-  const handleCreateDiscussion = async (e: FormEvent) => {
-    e.preventDefault()
-    
-    if (!session) {
+  const handleCreateDiscussion = async () => {
+    if (!isAuthenticated) {
       toast({
         title: "Authentication required",
         description: "Please sign in to create a discussion",
@@ -120,29 +116,55 @@ export default function CommunityPage() {
       return
     }
 
-    if (!newDiscussionTitle.trim() || !newDiscussion.trim()) {
+    // Validate input
+    if (!discussionInput.trim()) {
       toast({
-        title: "Missing information",
-        description: "Please provide both a title and content for your discussion",
+        title: "Content required",
+        description: "Please enter a message to post",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (discussionInput.trim().length < 10) {
+      toast({
+        title: "Content too short",
+        description: "Your message must be at least 10 characters",
         variant: "destructive",
       })
       return
     }
 
     try {
+      setIsSubmitting(true)
+      
+      // Generate title from content (first 50 chars or first sentence)
+      const contentText = discussionInput.trim()
+      let title = contentText.substring(0, 50)
+      // If title ends mid-word, find last space
+      if (title.length === 50 && contentText.length > 50 && title.charAt(49) !== ' ') {
+        const lastSpace = title.lastIndexOf(' ')
+        if (lastSpace > 0) {
+          title = title.substring(0, lastSpace)
+        }
+      }
+      // Add ellipsis if we truncated
+      if (title.length < contentText.length) {
+        title += '...'
+      }
+      
       const response = await createDiscussion({
-        title: newDiscussionTitle,
-        content: newDiscussion
+        title,
+        content: contentText
       })
       
       // Add new discussion to the list
       const discussionData = response as { data: { data: Discussion } }
-      setDiscussions([discussionData.data.data, ...discussions])
+      // Ensure discussions is treated as an array even if it's null or undefined
+      setDiscussions([discussionData.data.data, ...(Array.isArray(discussions) ? discussions : [])])
       
-      // Reset form
-      setNewDiscussion("")
-      setNewDiscussionTitle("")
-      setCreateDialogOpen(false)
+      // Reset input
+      setDiscussionInput("")
       
       toast({
         title: "Success",
@@ -155,11 +177,13 @@ export default function CommunityPage() {
         description: "Failed to create discussion. Please try again.",
         variant: "destructive",
       })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   const handlePostComment = async (discussionId: string) => {
-    if (!session) {
+    if (!isAuthenticated) {
       toast({
         title: "Authentication required",
         description: "Please sign in to comment",
@@ -216,7 +240,7 @@ export default function CommunityPage() {
   }
 
   const handleRSVP = async (eventId: string) => {
-    if (!session) {
+    if (!isAuthenticated) {
       toast({
         title: "Authentication required",
         description: "Please sign in to RSVP to events",
@@ -243,7 +267,7 @@ export default function CommunityPage() {
   }
 
   const handleJoinGroup = async (groupId: string) => {
-    if (!session) {
+    if (!isAuthenticated) {
       toast({
         title: "Authentication required",
         description: "Please sign in to join groups",
@@ -262,9 +286,9 @@ export default function CommunityPage() {
           return {
             ...group,
             members: [...group.members, { 
-              _id: (session?.user as any)?.id || "",
-              name: session?.user?.name || "User", 
-              email: session?.user?.email || ""
+              _id: user?._id || "",
+              name: user?.name || "User", 
+              email: user?.email || ""
             }]
           }
         }
@@ -287,8 +311,8 @@ export default function CommunityPage() {
 
   // Helper function to check if user is a member of a group
   const isGroupMember = (group: Group) => {
-    if (!session) return false
-    return group.members.some(member => member._id === (session?.user as any)?.id)
+    if (!isAuthenticated) return false
+    return group.members.some(member => member._id === user?._id)
   }
 
   // Format date for event display
@@ -325,64 +349,43 @@ export default function CommunityPage() {
           <TabsContent value="discussions" className="space-y-4">
             <div className="flex items-center space-x-2">
               <Avatar>
-                {session?.user?.image ? (
-                  <AvatarImage src={session.user.image} alt={session.user.name || "User"} />
+                {user?.image ? (
+                  <AvatarImage src={user.image} alt={user.name || "User"} />
                 ) : (
-                  <AvatarFallback>{session?.user?.name?.[0] || "U"}</AvatarFallback>
+                  <AvatarFallback>{user?.name?.[0] || "U"}</AvatarFallback>
                 )}
               </Avatar>
               <div className="flex-1">
-                <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Input placeholder="Start a discussion..." readOnly onClick={() => setCreateDialogOpen(true)} />
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Create New Discussion</DialogTitle>
-                      <DialogDescription>
-                        Share your thoughts, questions, or ideas with the community.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={handleCreateDiscussion} className="space-y-4">
-                      <div className="space-y-2">
-                        <FormLabel htmlFor="title">Title</FormLabel>
-                        <Input
-                          id="title"
-                          value={newDiscussionTitle}
-                          onChange={(e) => setNewDiscussionTitle(e.target.value)}
-                          placeholder="Enter a descriptive title"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <FormLabel htmlFor="content">Content</FormLabel>
-                        <Textarea
-                          id="content"
-                          value={newDiscussion}
-                          onChange={(e) => setNewDiscussion(e.target.value)}
-                          placeholder="Share your thoughts..."
-                          rows={5}
-                          required
-                        />
-                      </div>
-                      <DialogFooter>
-                        <Button type="submit">Post Discussion</Button>
-                      </DialogFooter>
-                    </form>
-                  </DialogContent>
-                </Dialog>
+                <Input 
+                  placeholder="Start a discussion..." 
+                  value={discussionInput}
+                  onChange={(e) => setDiscussionInput(e.target.value)}
+                />
               </div>
-              <Button onClick={() => setCreateDialogOpen(true)}>Post</Button>
+              <Button 
+                onClick={handleCreateDiscussion}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Posting..." : "Post"}
+              </Button>
             </div>
 
             {loading.discussions ? (
               <div className="flex justify-center py-8">
                 <p>Loading discussions...</p>
               </div>
-            ) : discussions.length === 0 ? (
+            ) : !discussions || discussions.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 space-y-4">
                 <p className="text-muted-foreground">No discussions found</p>
-                <Button onClick={() => setCreateDialogOpen(true)}>Create the first discussion</Button>
+                <Button 
+                  onClick={() => {
+                    setDiscussionInput("I would like to start a discussion about...");
+                    // Scroll to the input at the top
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                >
+                  Create the first discussion
+                </Button>
               </div>
             ) : (
               <>
@@ -425,13 +428,13 @@ export default function CommunityPage() {
                           <span>Share</span>
                         </Button>
                       </div>
-                      {session && (
+                      {isAuthenticated && (
                         <div className="flex items-center space-x-2 w-full">
                           <Avatar className="h-6 w-6">
-                            {session?.user?.image ? (
-                              <AvatarImage src={session.user.image} alt={session.user.name || "User"} />
+                            {user?.image ? (
+                              <AvatarImage src={user.image} alt={user.name || "User"} />
                             ) : (
-                              <AvatarFallback>{session?.user?.name?.[0] || "U"}</AvatarFallback>
+                              <AvatarFallback>{user?.name?.[0] || "U"}</AvatarFallback>
                             )}
                           </Avatar>
                           <Input 
@@ -459,7 +462,7 @@ export default function CommunityPage() {
               <div className="flex justify-center py-8">
                 <p>Loading events...</p>
               </div>
-            ) : events.length === 0 ? (
+            ) : !events || events.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 space-y-4">
                 <p className="text-muted-foreground">No upcoming events found</p>
                 <Button asChild>
@@ -523,7 +526,7 @@ export default function CommunityPage() {
               <div className="flex justify-center py-8">
                 <p>Loading groups...</p>
               </div>
-            ) : groups.length === 0 ? (
+            ) : !groups || groups.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 space-y-4">
                 <p className="text-muted-foreground">No groups found</p>
                 <Button asChild>

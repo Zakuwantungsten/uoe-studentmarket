@@ -6,8 +6,14 @@ const authController = require("../controllers/auth.controller")
 // Get all services
 router.get("/", serviceController.getAllServices)
 
-// NEW: Add this line right here ↓
-router.get("/featured", serviceController.getAllServices)
+// Get featured services
+router.get("/featured", (req, res, next) => {
+  req.query.featured = "true";
+  next();
+}, serviceController.getAllServices)
+
+// Get my services
+router.get("/my-services", authController.protect, serviceController.getMyServices)
 
 // Create a new service
 router.post("/", authController.protect, serviceController.createService)
@@ -20,6 +26,9 @@ router.patch("/:id", authController.protect, serviceController.updateService)
 
 // Delete service
 router.delete("/:id", authController.protect, serviceController.deleteService)
+
+// Toggle featured status (admin only)
+router.patch("/:id/featured", authController.protect, authController.restrictTo("admin"), serviceController.toggleFeatured)
 
 module.exports = router
 
