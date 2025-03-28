@@ -37,6 +37,10 @@ const adminRoutes = require("./routes/admin.routes")
 const uploadRoutes = require("./routes/upload.routes")
 const paymentRoutes = require("./routes/payment.routes")
 const notificationRoutes = require("./routes/notification.routes")
+const discussionRoutes = require("./routes/discussion.routes")
+const commentRoutes = require("./routes/comment.routes")
+const eventRoutes = require("./routes/event.routes")
+const groupRoutes = require("./routes/group.routes")
 
 // Use routes
 app.use("/api/auth", authRoutes)
@@ -50,6 +54,10 @@ app.use("/api/admin", adminRoutes)
 app.use("/api/upload", uploadRoutes)
 app.use("/api/payments", paymentRoutes)
 app.use("/api/notifications", notificationRoutes)
+app.use("/api/discussions", discussionRoutes)
+app.use("/api/comments", commentRoutes)
+app.use("/api/events", eventRoutes)
+app.use("/api/groups", groupRoutes)
 
 // Root route
 app.get("/", (req, res) => {

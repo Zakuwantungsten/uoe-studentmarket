@@ -1,21 +1,301 @@
+"use client"
+
 import type { Metadata } from "next"
+import { useState, useEffect, FormEvent } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { MessageSquare, Calendar, Users, ArrowRight, ThumbsUp, MessageCircle, Share2, MapPin } from "lucide-react"
+import { format } from "date-fns"
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { useToast } from "@/components/ui/use-toast"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 
-export const metadata: Metadata = {
+import { getAllDiscussions, createDiscussion, createComment, Discussion, Comment } from "@/lib/services/discussion-service"
+import { getAllEvents, rsvpToEvent, Event } from "@/lib/services/event-service"
+import { getAllGroups, joinGroup, leaveGroup, Group } from "@/lib/services/group-service"
+
+export const metadata = {
   title: "Community | UoE Student Marketplace",
   description: "Connect with the University of Eldoret student community",
 }
 
 export default function CommunityPage() {
+  const { data: session } = useSession()
+  const router = useRouter()
+  const { toast } = useToast()
+  
+  const [discussions, setDiscussions] = useState<Discussion[]>([])
+  const [events, setEvents] = useState<Event[]>([])
+  const [groups, setGroups] = useState<Group[]>([])
+  const [loading, setLoading] = useState({
+    discussions: true,
+    events: true,
+    groups: true
+  })
+  const [newDiscussion, setNewDiscussion] = useState("")
+  const [newDiscussionTitle, setNewDiscussionTitle] = useState("")
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [commentText, setCommentText] = useState<{[key: string]: string}>({})
+
+  useEffect(() => {
+    // Fetch discussions
+    const loadDiscussions = async () => {
+      try {
+        const res = await getAllDiscussions(1, 10)
+        const discussionData = res as { data: { data: Discussion[] } }
+        setDiscussions(discussionData.data.data)
+        setLoading(prev => ({ ...prev, discussions: false }))
+      } catch (error) {
+        console.error("Error fetching discussions:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load discussions. Please try again later.",
+          variant: "destructive",
+        })
+        setLoading(prev => ({ ...prev, discussions: false }))
+      }
+    }
+
+    // Fetch events
+    const loadEvents = async () => {
+      try {
+        const res = await getAllEvents(1, 3, true)
+        const eventData = res as { data: { data: Event[] } }
+        setEvents(eventData.data.data)
+        setLoading(prev => ({ ...prev, events: false }))
+      } catch (error) {
+        console.error("Error fetching events:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load events. Please try again later.",
+          variant: "destructive",
+        })
+        setLoading(prev => ({ ...prev, events: false }))
+      }
+    }
+
+    // Fetch groups
+    const loadGroups = async () => {
+      try {
+        const res = await getAllGroups(1, 6)
+        const groupData = res as { data: { data: Group[] } }
+        setGroups(groupData.data.data)
+        setLoading(prev => ({ ...prev, groups: false }))
+      } catch (error) {
+        console.error("Error fetching groups:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load groups. Please try again later.",
+          variant: "destructive",
+        })
+        setLoading(prev => ({ ...prev, groups: false }))
+      }
+    }
+
+    loadDiscussions()
+    loadEvents()
+    loadGroups()
+  }, [toast])
+
+  const handleCreateDiscussion = async (e: FormEvent) => {
+    e.preventDefault()
+    
+    if (!session) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to create a discussion",
+        variant: "destructive",
+      })
+      router.push("/login")
+      return
+    }
+
+    if (!newDiscussionTitle.trim() || !newDiscussion.trim()) {
+      toast({
+        title: "Missing information",
+        description: "Please provide both a title and content for your discussion",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const response = await createDiscussion({
+        title: newDiscussionTitle,
+        content: newDiscussion
+      })
+      
+      // Add new discussion to the list
+      const discussionData = response as { data: { data: Discussion } }
+      setDiscussions([discussionData.data.data, ...discussions])
+      
+      // Reset form
+      setNewDiscussion("")
+      setNewDiscussionTitle("")
+      setCreateDialogOpen(false)
+      
+      toast({
+        title: "Success",
+        description: "Your discussion has been posted",
+      })
+    } catch (error) {
+      console.error("Error creating discussion:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create discussion. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handlePostComment = async (discussionId: string) => {
+    if (!session) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to comment",
+        variant: "destructive",
+      })
+      router.push("/login")
+      return
+    }
+
+    if (!commentText[discussionId]?.trim()) {
+      toast({
+        title: "Comment required",
+        description: "Please enter a comment",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const response = await createComment({
+        content: commentText[discussionId],
+        discussionId
+      })
+      
+      // Update the discussions list with the new comment
+      setDiscussions(discussions.map(discussion => {
+        if (discussion._id === discussionId) {
+          return {
+            ...discussion,
+            comments: [
+              (response as { data: { data: Comment } }).data.data, 
+              ...(discussion.comments || [])
+            ]
+          }
+        }
+        return discussion
+      }))
+      
+      // Clear comment input
+      setCommentText({...commentText, [discussionId]: ""})
+      
+      toast({
+        title: "Success",
+        description: "Your comment has been posted",
+      })
+    } catch (error) {
+      console.error("Error posting comment:", error)
+      toast({
+        title: "Error",
+        description: "Failed to post comment. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleRSVP = async (eventId: string) => {
+    if (!session) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to RSVP to events",
+        variant: "destructive",
+      })
+      router.push("/login")
+      return
+    }
+
+    try {
+      await rsvpToEvent(eventId)
+      toast({
+        title: "Success",
+        description: "You have successfully RSVP'd to this event",
+      })
+    } catch (error) {
+      console.error("Error RSVP'ing to event:", error)
+      toast({
+        title: "Error",
+        description: "Failed to RSVP to event. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleJoinGroup = async (groupId: string) => {
+    if (!session) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to join groups",
+        variant: "destructive",
+      })
+      router.push("/login")
+      return
+    }
+
+    try {
+      await joinGroup(groupId)
+      
+      // Update groups list to reflect membership
+      setGroups(groups.map(group => {
+        if (group._id === groupId) {
+          return {
+            ...group,
+            members: [...group.members, { 
+              _id: (session?.user as any)?.id || "",
+              name: session?.user?.name || "User", 
+              email: session?.user?.email || ""
+            }]
+          }
+        }
+        return group
+      }))
+      
+      toast({
+        title: "Success",
+        description: "You have successfully joined the group",
+      })
+    } catch (error) {
+      console.error("Error joining group:", error)
+      toast({
+        title: "Error",
+        description: "Failed to join group. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Helper function to check if user is a member of a group
+  const isGroupMember = (group: Group) => {
+    if (!session) return false
+    return group.members.some(member => member._id === (session?.user as any)?.id)
+  }
+
+  // Format date for event display
+  const formatEventDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return format(date, "MMMM d, yyyy • h:mm a")
+  }
   return (
     <div className="container px-4 md:px-6 py-8">
       <div className="flex flex-col space-y-8">
@@ -45,398 +325,260 @@ export default function CommunityPage() {
           <TabsContent value="discussions" className="space-y-4">
             <div className="flex items-center space-x-2">
               <Avatar>
-                <AvatarFallback>JM</AvatarFallback>
+                {session?.user?.image ? (
+                  <AvatarImage src={session.user.image} alt={session.user.name || "User"} />
+                ) : (
+                  <AvatarFallback>{session?.user?.name?.[0] || "U"}</AvatarFallback>
+                )}
               </Avatar>
               <div className="flex-1">
-                <Input placeholder="Start a discussion..." />
+                <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Input placeholder="Start a discussion..." readOnly onClick={() => setCreateDialogOpen(true)} />
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Create New Discussion</DialogTitle>
+                      <DialogDescription>
+                        Share your thoughts, questions, or ideas with the community.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleCreateDiscussion} className="space-y-4">
+                      <div className="space-y-2">
+                        <FormLabel htmlFor="title">Title</FormLabel>
+                        <Input
+                          id="title"
+                          value={newDiscussionTitle}
+                          onChange={(e) => setNewDiscussionTitle(e.target.value)}
+                          placeholder="Enter a descriptive title"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <FormLabel htmlFor="content">Content</FormLabel>
+                        <Textarea
+                          id="content"
+                          value={newDiscussion}
+                          onChange={(e) => setNewDiscussion(e.target.value)}
+                          placeholder="Share your thoughts..."
+                          rows={5}
+                          required
+                        />
+                      </div>
+                      <DialogFooter>
+                        <Button type="submit">Post Discussion</Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
               </div>
-              <Button>Post</Button>
+              <Button onClick={() => setCreateDialogOpen(true)}>Post</Button>
             </div>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex items-start space-x-4">
-                  <Avatar>
-                    <AvatarFallback>SW</AvatarFallback>
-                  </Avatar>
-                  <div className="space-y-1">
-                    <div className="flex items-center space-x-2">
-                      <h3 className="font-medium">Sarah Wanjiku</h3>
-                      <Badge variant="outline">Business Admin</Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Posted 2 hours ago</p>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <h3 className="text-lg font-medium mb-2">Looking for a study group for Business Statistics</h3>
-                <p className="text-sm">
-                  Hey everyone! I'm looking for students who want to form a study group for Business Statistics (BUS
-                  204). We can meet twice a week at the library. Anyone interested?
-                </p>
-              </CardContent>
-              <CardFooter className="border-t pt-4">
-                <div className="flex items-center space-x-4 w-full">
-                  <Button variant="ghost" size="sm" className="flex items-center">
-                    <ThumbsUp className="h-4 w-4 mr-1" />
-                    <span>24</span>
-                  </Button>
-                  <Button variant="ghost" size="sm" className="flex items-center">
-                    <MessageCircle className="h-4 w-4 mr-1" />
-                    <span>12 Comments</span>
-                  </Button>
-                  <Button variant="ghost" size="sm" className="flex items-center ml-auto">
-                    <Share2 className="h-4 w-4 mr-1" />
-                    <span>Share</span>
-                  </Button>
-                </div>
-              </CardFooter>
-            </Card>
+            {loading.discussions ? (
+              <div className="flex justify-center py-8">
+                <p>Loading discussions...</p>
+              </div>
+            ) : discussions.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 space-y-4">
+                <p className="text-muted-foreground">No discussions found</p>
+                <Button onClick={() => setCreateDialogOpen(true)}>Create the first discussion</Button>
+              </div>
+            ) : (
+              <>
+                {discussions.map((discussion) => (
+                  <Card key={discussion._id}>
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start space-x-4">
+                        <Avatar>
+                          <AvatarFallback>
+                            {discussion.author?.name?.[0] || "U"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="space-y-1">
+                          <div className="flex items-center space-x-2">
+                            <h3 className="font-medium">{discussion.author?.name || "Unknown User"}</h3>
+                            <Badge variant="outline">Student</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Posted {new Date(discussion.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <h3 className="text-lg font-medium mb-2">{discussion.title}</h3>
+                      <p className="text-sm">{discussion.content}</p>
+                    </CardContent>
+                    <CardFooter className="border-t pt-4 flex-col space-y-4">
+                      <div className="flex items-center space-x-4 w-full">
+                        <Button variant="ghost" size="sm" className="flex items-center">
+                          <ThumbsUp className="h-4 w-4 mr-1" />
+                          <span>0</span>
+                        </Button>
+                        <Button variant="ghost" size="sm" className="flex items-center">
+                          <MessageCircle className="h-4 w-4 mr-1" />
+                          <span>{discussion.comments?.length || 0} Comments</span>
+                        </Button>
+                        <Button variant="ghost" size="sm" className="flex items-center ml-auto">
+                          <Share2 className="h-4 w-4 mr-1" />
+                          <span>Share</span>
+                        </Button>
+                      </div>
+                      {session && (
+                        <div className="flex items-center space-x-2 w-full">
+                          <Avatar className="h-6 w-6">
+                            {session?.user?.image ? (
+                              <AvatarImage src={session.user.image} alt={session.user.name || "User"} />
+                            ) : (
+                              <AvatarFallback>{session?.user?.name?.[0] || "U"}</AvatarFallback>
+                            )}
+                          </Avatar>
+                          <Input 
+                            placeholder="Add a comment..."
+                            value={commentText[discussion._id] || ""}
+                            onChange={(e) => setCommentText({...commentText, [discussion._id]: e.target.value})}
+                            className="flex-1"
+                          />
+                          <Button size="sm" onClick={() => handlePostComment(discussion._id)}>Reply</Button>
+                        </div>
+                      )}
+                    </CardFooter>
+                  </Card>
+                ))}
 
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex items-start space-x-4">
-                  <Avatar>
-                    <AvatarFallback>DO</AvatarFallback>
-                  </Avatar>
-                  <div className="space-y-1">
-                    <div className="flex items-center space-x-2">
-                      <h3 className="font-medium">David Omondi</h3>
-                      <Badge variant="outline">Engineering</Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Posted 5 hours ago</p>
-                  </div>
+                <div className="flex justify-center">
+                  <Button variant="outline">Load More Discussions</Button>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <h3 className="text-lg font-medium mb-2">Recommendations for affordable laptops?</h3>
-                <p className="text-sm">
-                  My laptop just died and I need a new one for my engineering projects. Looking for something affordable
-                  but powerful enough for CAD software. Any recommendations from fellow students?
-                </p>
-              </CardContent>
-              <CardFooter className="border-t pt-4">
-                <div className="flex items-center space-x-4 w-full">
-                  <Button variant="ghost" size="sm" className="flex items-center">
-                    <ThumbsUp className="h-4 w-4 mr-1" />
-                    <span>18</span>
-                  </Button>
-                  <Button variant="ghost" size="sm" className="flex items-center">
-                    <MessageCircle className="h-4 w-4 mr-1" />
-                    <span>8 Comments</span>
-                  </Button>
-                  <Button variant="ghost" size="sm" className="flex items-center ml-auto">
-                    <Share2 className="h-4 w-4 mr-1" />
-                    <span>Share</span>
-                  </Button>
-                </div>
-              </CardFooter>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex items-start space-x-4">
-                  <Avatar>
-                    <AvatarFallback>MA</AvatarFallback>
-                  </Avatar>
-                  <div className="space-y-1">
-                    <div className="flex items-center space-x-2">
-                      <h3 className="font-medium">Mary Akinyi</h3>
-                      <Badge variant="outline">Education</Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Posted yesterday</p>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <h3 className="text-lg font-medium mb-2">Teaching practice tips needed!</h3>
-                <p className="text-sm">
-                  I'm starting my teaching practice next month at a local primary school. Any education students who've
-                  already done their TP have tips or advice to share?
-                </p>
-              </CardContent>
-              <CardFooter className="border-t pt-4">
-                <div className="flex items-center space-x-4 w-full">
-                  <Button variant="ghost" size="sm" className="flex items-center">
-                    <ThumbsUp className="h-4 w-4 mr-1" />
-                    <span>32</span>
-                  </Button>
-                  <Button variant="ghost" size="sm" className="flex items-center">
-                    <MessageCircle className="h-4 w-4 mr-1" />
-                    <span>15 Comments</span>
-                  </Button>
-                  <Button variant="ghost" size="sm" className="flex items-center ml-auto">
-                    <Share2 className="h-4 w-4 mr-1" />
-                    <span>Share</span>
-                  </Button>
-                </div>
-              </CardFooter>
-            </Card>
-
-            <div className="flex justify-center">
-              <Button variant="outline">Load More Discussions</Button>
-            </div>
+              </>
+            )}
           </TabsContent>
 
           <TabsContent value="events" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <Card>
-                <div className="relative h-48">
-                  <Image
-                    src="/placeholder.svg?height=200&width=400"
-                    alt="Career Fair"
-                    fill
-                    className="object-cover rounded-t-lg"
-                  />
-                  <Badge className="absolute top-2 right-2 bg-primary">Upcoming</Badge>
+            {loading.events ? (
+              <div className="flex justify-center py-8">
+                <p>Loading events...</p>
+              </div>
+            ) : events.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 space-y-4">
+                <p className="text-muted-foreground">No upcoming events found</p>
+                <Button asChild>
+                  <Link href="/create-event">Create an event</Link>
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {events.map(event => (
+                    <Card key={event._id}>
+                      <div className="relative h-48">
+                        <Image
+                          src={event.image || "/placeholder.svg?height=200&width=400"}
+                          alt={event.title}
+                          fill
+                          className="object-cover rounded-t-lg"
+                        />
+                        <Badge className="absolute top-2 right-2 bg-primary">Upcoming</Badge>
+                      </div>
+                      <CardHeader>
+                        <CardTitle>{event.title}</CardTitle>
+                        <CardDescription>
+                          {formatEventDate(event.startDate)}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm">{event.description}</p>
+                        <div className="flex items-center space-x-2 mt-4 text-sm">
+                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                          <span>{event.location}</span>
+                        </div>
+                        <div className="flex items-center space-x-2 mt-2 text-sm">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          <span>Organized by {event.organizer?.name || "Unknown"}</span>
+                        </div>
+                      </CardContent>
+                      <CardFooter>
+                        <Button 
+                          className="w-full" 
+                          onClick={() => handleRSVP(event._id)}
+                        >
+                          RSVP
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  ))}
                 </div>
-                <CardHeader>
-                  <CardTitle>Campus Career Fair</CardTitle>
-                  <CardDescription>June 25, 2023 • 9:00 AM - 4:00 PM</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm">
-                    Connect with potential employers, explore internship opportunities, and get your CV reviewed by
-                    professionals.
-                  </p>
-                  <div className="flex items-center space-x-2 mt-4 text-sm">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <span>Main Auditorium</span>
-                  </div>
-                  <div className="flex items-center space-x-2 mt-2 text-sm">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <span>120 attending</span>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">RSVP</Button>
-                </CardFooter>
-              </Card>
 
-              <Card>
-                <div className="relative h-48">
-                  <Image
-                    src="/placeholder.svg?height=200&width=400"
-                    alt="Hackathon"
-                    fill
-                    className="object-cover rounded-t-lg"
-                  />
-                  <Badge className="absolute top-2 right-2 bg-primary">Upcoming</Badge>
+                <div className="flex justify-center">
+                  <Button variant="outline" asChild>
+                    <Link href="/events">View All Events</Link>
+                  </Button>
                 </div>
-                <CardHeader>
-                  <CardTitle>Student Hackathon</CardTitle>
-                  <CardDescription>July 1-2, 2023 • 48 Hours</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm">
-                    Join teams of students to build innovative solutions to real-world problems. Prizes for the top
-                    three teams!
-                  </p>
-                  <div className="flex items-center space-x-2 mt-4 text-sm">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <span>Computer Science Building</span>
-                  </div>
-                  <div className="flex items-center space-x-2 mt-2 text-sm">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <span>75 attending</span>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">RSVP</Button>
-                </CardFooter>
-              </Card>
-
-              <Card>
-                <div className="relative h-48">
-                  <Image
-                    src="/placeholder.svg?height=200&width=400"
-                    alt="Workshop"
-                    fill
-                    className="object-cover rounded-t-lg"
-                  />
-                  <Badge className="absolute top-2 right-2 bg-primary">Upcoming</Badge>
-                </div>
-                <CardHeader>
-                  <CardTitle>Entrepreneurship Workshop</CardTitle>
-                  <CardDescription>July 10, 2023 • 2:00 PM - 5:00 PM</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm">
-                    Learn how to start and grow your own business while still in university. Guest speakers from
-                    successful startups.
-                  </p>
-                  <div className="flex items-center space-x-2 mt-4 text-sm">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <span>Business School, Room 105</span>
-                  </div>
-                  <div className="flex items-center space-x-2 mt-2 text-sm">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <span>50 attending</span>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">RSVP</Button>
-                </CardFooter>
-              </Card>
-            </div>
-
-            <div className="flex justify-center">
-              <Button variant="outline" asChild>
-                <Link href="/events">View All Events</Link>
-              </Button>
-            </div>
+              </>
+            )}
           </TabsContent>
 
           <TabsContent value="groups" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Computer Science Society</CardTitle>
-                  <CardDescription>Tech enthusiasts and CS students</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex -space-x-2 mb-4">
-                    {[...Array(5)].map((_, i) => (
-                      <Avatar key={i} className="border-2 border-background">
-                        <AvatarFallback>{String.fromCharCode(65 + i)}</AvatarFallback>
-                      </Avatar>
-                    ))}
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-xs">+42</div>
-                  </div>
-                  <p className="text-sm">
-                    A community for computer science students to collaborate on projects, share resources, and organize
-                    tech events.
-                  </p>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">Join Group</Button>
-                </CardFooter>
-              </Card>
+            {loading.groups ? (
+              <div className="flex justify-center py-8">
+                <p>Loading groups...</p>
+              </div>
+            ) : groups.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 space-y-4">
+                <p className="text-muted-foreground">No groups found</p>
+                <Button asChild>
+                  <Link href="/create-group">Create a group</Link>
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {groups.map(group => (
+                    <Card key={group._id}>
+                      <CardHeader>
+                        <CardTitle>{group.name}</CardTitle>
+                        <CardDescription>Created by {group.creator?.name || "Unknown"}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex -space-x-2 mb-4">
+                          {group.members.slice(0, 5).map((member, i) => (
+                            <Avatar key={member._id} className="border-2 border-background">
+                              <AvatarFallback>{member.name?.[0] || String.fromCharCode(65 + i)}</AvatarFallback>
+                            </Avatar>
+                          ))}
+                          {group.members.length > 5 && (
+                            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-xs">
+                              +{group.members.length - 5}
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-sm">{group.description}</p>
+                      </CardContent>
+                      <CardFooter>
+                        {isGroupMember(group) ? (
+                          <Button className="w-full" variant="outline" disabled>
+                            Joined
+                          </Button>
+                        ) : (
+                          <Button 
+                            className="w-full"
+                            onClick={() => handleJoinGroup(group._id)}
+                          >
+                            Join Group
+                          </Button>
+                        )}
+                      </CardFooter>
+                    </Card>
+                  ))}
+                </div>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Business & Entrepreneurship</CardTitle>
-                  <CardDescription>Future business leaders</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex -space-x-2 mb-4">
-                    {[...Array(5)].map((_, i) => (
-                      <Avatar key={i} className="border-2 border-background">
-                        <AvatarFallback>{String.fromCharCode(70 + i)}</AvatarFallback>
-                      </Avatar>
-                    ))}
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-xs">+38</div>
-                  </div>
-                  <p className="text-sm">
-                    Connect with business-minded students, discuss market trends, and develop entrepreneurial skills.
-                  </p>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">Join Group</Button>
-                </CardFooter>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Creative Arts Collective</CardTitle>
-                  <CardDescription>Artists, designers, and creatives</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex -space-x-2 mb-4">
-                    {[...Array(5)].map((_, i) => (
-                      <Avatar key={i} className="border-2 border-background">
-                        <AvatarFallback>{String.fromCharCode(75 + i)}</AvatarFallback>
-                      </Avatar>
-                    ))}
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-xs">+25</div>
-                  </div>
-                  <p className="text-sm">
-                    A space for creative students to showcase their work, collaborate on projects, and organize
-                    exhibitions.
-                  </p>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">Join Group</Button>
-                </CardFooter>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Engineering Students Association</CardTitle>
-                  <CardDescription>Future engineers and innovators</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex -space-x-2 mb-4">
-                    {[...Array(5)].map((_, i) => (
-                      <Avatar key={i} className="border-2 border-background">
-                        <AvatarFallback>{String.fromCharCode(80 + i)}</AvatarFallback>
-                      </Avatar>
-                    ))}
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-xs">+56</div>
-                  </div>
-                  <p className="text-sm">
-                    Connect with fellow engineering students, work on practical projects, and prepare for industry
-                    challenges.
-                  </p>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">Join Group</Button>
-                </CardFooter>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Health Sciences Network</CardTitle>
-                  <CardDescription>Medical and health students</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex -space-x-2 mb-4">
-                    {[...Array(5)].map((_, i) => (
-                      <Avatar key={i} className="border-2 border-background">
-                        <AvatarFallback>{String.fromCharCode(85 + i)}</AvatarFallback>
-                      </Avatar>
-                    ))}
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-xs">+32</div>
-                  </div>
-                  <p className="text-sm">
-                    A community for health science students to share knowledge, discuss case studies, and organize
-                    health awareness events.
-                  </p>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">Join Group</Button>
-                </CardFooter>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Environmental Action Club</CardTitle>
-                  <CardDescription>Eco-conscious students</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex -space-x-2 mb-4">
-                    {[...Array(5)].map((_, i) => (
-                      <Avatar key={i} className="border-2 border-background">
-                        <AvatarFallback>{String.fromCharCode(90 + i)}</AvatarFallback>
-                      </Avatar>
-                    ))}
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-xs">+19</div>
-                  </div>
-                  <p className="text-sm">
-                    Join like-minded students in promoting environmental sustainability on campus and in the community.
-                  </p>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">Join Group</Button>
-                </CardFooter>
-              </Card>
-            </div>
-
-            <div className="flex justify-center">
-              <Button variant="outline" asChild>
-                <Link href="/groups">View All Groups</Link>
-              </Button>
-            </div>
+                <div className="flex justify-center">
+                  <Button variant="outline" asChild>
+                    <Link href="/groups">View All Groups</Link>
+                  </Button>
+                </div>
+              </>
+            )}
           </TabsContent>
         </Tabs>
 
