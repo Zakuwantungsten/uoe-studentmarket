@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, FormEvent, ChangeEvent } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Upload } from "lucide-react"
+import { ArrowLeft, Upload, UserPlus, AlertCircle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,18 +13,22 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/components/ui/use-toast"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import DashboardLayout from "@/components/dashboard-layout"
 import { useAuth } from "@/contexts/auth-context"
 import { categoryService } from "@/lib/services/category-service"
 import { serviceService } from "@/lib/services/service-service"
 import { apiClient } from "@/lib/api-client"
 import { Category, ApiResponse } from "@/lib/types"
+import { authService } from "@/lib/services/auth-service"
 
 export default function OfferServicePage() {
-  const { user, token, isAuthenticated, isLoading: authLoading } = useAuth()
+  const { user, token, isAuthenticated, isLoading: authLoading, updateUser } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
+  const [isUpgradingAccount, setIsUpgradingAccount] = useState(false)
+  
   interface FormData {
     title: string;
     description: string;
@@ -73,32 +77,60 @@ export default function OfferServicePage() {
       return
     }
 
-    if (!authLoading && user?.role !== "PROVIDER") {
+    // Only fetch categories if user is a provider
+    if (!authLoading && user?.role === "PROVIDER") {
+      fetchCategories()
+    }
+  }, [authLoading, isAuthenticated, user, router])
+
+  const fetchCategories = async () => {
+    try {
+      const response = await categoryService.getCategories()
+      setCategories(response.data)
+    } catch (error) {
+      console.error("Error fetching categories:", error)
       toast({
-        title: "Access denied",
-        description: "Only service providers can offer services",
+        title: "Error",
+        description: "Failed to load categories. Please try again.",
         variant: "destructive",
       })
-      router.push("/dashboard")
-      return
     }
+  }
 
-    const fetchCategories = async () => {
-      try {
-        const response = await categoryService.getCategories()
-        setCategories(response.data)
-      } catch (error) {
-        console.error("Error fetching categories:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load categories. Please try again.",
-          variant: "destructive",
-        })
+  const handleUpgradeToProvider = async () => {
+    if (!token || !user) return
+
+    try {
+      setIsUpgradingAccount(true)
+
+      // Update user role to PROVIDER - using the correct type
+      const updatedUserData = {
+        ...user,
+        role: "PROVIDER" as "PROVIDER" // Type assertion to match expected enum
       }
-    }
 
-    fetchCategories()
-  }, [authLoading, isAuthenticated, user, router, toast])
+      const apiResponse = await authService.updateProfile(updatedUserData, token)
+      // Update local user context
+      updateUser(apiResponse.data)
+
+      toast({
+        title: "Account upgraded",
+        description: "Your account has been upgraded to provider status. You can now offer services!",
+      })
+
+      // Fetch categories now that the user is a provider
+      fetchCategories()
+    } catch (error) {
+      console.error("Error upgrading account:", error)
+      toast({
+        title: "Error",
+        description: "Failed to upgrade your account. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUpgradingAccount(false)
+    }
+  }
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target
@@ -226,6 +258,66 @@ export default function OfferServicePage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // If user is not a provider, show an upgrade message
+  if (!authLoading && user && user.role !== "PROVIDER") {
+    return (
+      <DashboardLayout>
+        <div className="container max-w-4xl py-8">
+          <div className="flex flex-col space-y-6">
+            <div className="flex items-center space-x-2">
+              <Button variant="ghost" size="icon" asChild>
+                <Link href="/dashboard">
+                  <ArrowLeft className="h-5 w-5" />
+                </Link>
+              </Button>
+              <h1 className="text-3xl font-bold tracking-tight">Offer a New Service</h1>
+            </div>
+
+            <Alert variant="default" className="bg-amber-50 border-amber-200">
+              <AlertCircle className="h-5 w-5 text-amber-600" />
+              <AlertTitle className="text-amber-800">Provider Account Required</AlertTitle>
+              <AlertDescription className="text-amber-700">
+                To offer services on the platform, you need to upgrade your account to a service provider.
+                This will allow you to create and manage service listings, receive bookings, and earn from your skills.
+              </AlertDescription>
+            </Alert>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Become a Service Provider</CardTitle>
+                <CardDescription>
+                  Upgrade your account to start offering your skills and services to other students
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="mb-6">
+                  As a service provider, you can:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-6">
+                  <li>Create service listings to showcase your skills</li>
+                  <li>Set your own prices and availability</li>
+                  <li>Receive bookings from other students</li>
+                  <li>Build your reputation with reviews</li>
+                  <li>Earn money sharing your knowledge and skills</li>
+                </ul>
+              </CardContent>
+              <CardFooter>
+                <Button 
+                  onClick={handleUpgradeToProvider} 
+                  disabled={isUpgradingAccount}
+                  className="w-full sm:w-auto"
+                >
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  {isUpgradingAccount ? "Upgrading..." : "Upgrade to Provider"}
+                </Button>
+              </CardFooter>
+            </Card>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
   }
 
   return (
@@ -566,4 +658,3 @@ export default function OfferServicePage() {
     </DashboardLayout>
   )
 }
-
