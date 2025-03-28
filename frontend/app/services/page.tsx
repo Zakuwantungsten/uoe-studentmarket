@@ -52,6 +52,15 @@ export default function ServicesPage() {
     fetchCategories()
   }, [])
 
+  // Update sortBy when tab changes
+  useEffect(() => {
+    if (activeTab === "new") {
+      setSortBy("newest")
+    } else if (activeTab === "popular") {
+      setSortBy("rating")
+    }
+  }, [activeTab])
+
   useEffect(() => {
     const fetchServices = async () => {
       try {

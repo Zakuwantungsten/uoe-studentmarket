@@ -80,13 +80,35 @@ exports.getAllServices = async (req, res) => {
       ]
     }
 
+    // Handle sorting
+    let sortOption = "-createdAt"; // Default sort by newest
+    
+    if (req.query.sort) {
+      switch(req.query.sort) {
+        case "price-low":
+          sortOption = "price"; // Ascending price
+          break;
+        case "price-high":
+          sortOption = "-price"; // Descending price
+          break;
+        case "newest":
+          sortOption = "-createdAt"; // Descending creation date
+          break;
+        case "rating":
+          sortOption = "-averageRating"; // Descending rating
+          break;
+        default:
+          sortOption = req.query.sort;
+      }
+    }
+
     // Execute query with pagination
     const services = await Service.find(filter)
       .populate("provider", "name email image")
       .populate("category", "name")
       .skip(skip)
       .limit(limit)
-      .sort(req.query.sort || "-createdAt")
+      .sort(sortOption)
 
     // Get total count for pagination
     const total = await Service.countDocuments(filter)
