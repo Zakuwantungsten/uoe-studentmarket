@@ -66,6 +66,9 @@ export default function EarningsSummary() {
       ? ((earningData.monthlyEarnings - earningData.previousMonthEarnings) / earningData.previousMonthEarnings) * 100
       : 100
 
+  // Add default empty array if weeklyEarnings is undefined
+  const weeklyEarnings = earningData.weeklyEarnings || []
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -86,24 +89,30 @@ export default function EarningsSummary() {
           </span>
         </div>
         <div className="flex items-end gap-1 h-16">
-          {earningData.weeklyEarnings.map((amount, index) => {
-            const maxAmount = Math.max(...earningData.weeklyEarnings)
-            const height = maxAmount > 0 ? (amount / maxAmount) * 100 : 0
+          {weeklyEarnings.length > 0 ? (
+            weeklyEarnings.map((amount, index) => {
+              const maxAmount = Math.max(...weeklyEarnings)
+              const height = maxAmount > 0 ? (amount / maxAmount) * 100 : 0
 
-            return (
-              <div key={index} className="flex-1 flex flex-col items-center">
-                <div className="w-full bg-primary/80 rounded-sm" style={{ height: `${height}%` }}></div>
-                <span className="text-xs mt-1">W{index + 1}</span>
-              </div>
-            )
-          })}
+              return (
+                <div key={index} className="flex-1 flex flex-col items-center">
+                  <div className="w-full bg-primary/80 rounded-sm" style={{ height: `${height}%` }}></div>
+                  <span className="text-xs mt-1">W{index + 1}</span>
+                </div>
+              )
+            })
+          ) : (
+            <div className="text-muted-foreground text-sm w-full text-center">
+              No weekly earnings data available
+            </div>
+          )}
         </div>
       </div>
 
       <div className="flex justify-between text-sm">
         <div>
           <p className="text-muted-foreground">Pending</p>
-          <p className="font-medium">KSh {earningData.pendingEarnings}</p>
+          <p className="font-medium">KSh {earningData.pendingEarnings || 0}</p>
         </div>
         <div>
           <p className="text-muted-foreground">Total</p>
@@ -113,4 +122,3 @@ export default function EarningsSummary() {
     </div>
   )
 }
-

@@ -1,90 +1,66 @@
 import { NextResponse } from "next/server"
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
-import prisma from "@/lib/prisma"
 
-// GET all users (admin only)
+// GET user dashboard stats
 export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions)
-
-    // Check if user is authenticated and is an admin
-    if (!session || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+    // Get token from Authorization header
+    const authHeader = req.headers.get("Authorization")
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get query parameters
-    const { searchParams } = new URL(req.url)
-    const page = Number.parseInt(searchParams.get("page") || "1")
-    const limit = Number.parseInt(searchParams.get("limit") || "10")
-    const search = searchParams.get("search") || ""
-    const status = searchParams.get("status")
-    const role = searchParams.get("role")
-
-    // Calculate pagination
-    const skip = (page - 1) * limit
-
-    // Build where clause
-    const where: any = {}
-
-    if (search) {
-      where.OR = [
-        { name: { contains: search, mode: "insensitive" } },
-        { email: { contains: search, mode: "insensitive" } },
-      ]
+    const token = authHeader.split(" ")[1]
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    if (status) {
-      where.status = status
-    }
-
-    if (role) {
-      where.role = role
-    }
-
-    // Get users with pagination
-    const users = await prisma.user.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        image: true,
-        role: true,
-        status: true,
-        studentId: true,
-        title: true,
-        createdAt: true,
-        _count: {
-          select: {
-            providedServices: true,
-            bookingsAsCustomer: true,
-            reviewsReceived: true,
-          },
-        },
-      },
-      skip,
-      take: limit,
-      orderBy: {
-        createdAt: "desc",
+    // Fetch user stats from backend
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/stats`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
       },
     })
 
-    // Get total count
-    const total = await prisma.user.count({ where })
+    if (!response.ok) {
+      const errorData = await response.json()
+      return NextResponse.json(
+        { error: errorData.message || "Failed to fetch user stats" },
+        { status: response.status }
+      )
+    }
 
-    return NextResponse.json({
-      users,
-      pagination: {
-        total,
-        page,
-        limit,
-        pages: Math.ceil(total / limit),
-      },
-    })
+    const data = await response.json()
+
+    if (!data.success) {
+      return NextResponse.json(
+        { error: data.message || "Failed to fetch user stats" },
+        { status: 500 }
+      )
+    }
+
+    // Transform data to match what the frontend expects
+    const stats = {
+      totalBookings: Number(data.data.totalBookings || 0),
+      pendingBookings: Number(data.data.bookingsAsProvider || 0),
+      completedBookings: 0,
+      totalEarnings: Number(data.data.totalEarnings || 0),
+      // Add weeklyEarnings with some sample data
+      weeklyEarnings: [1000, 1500, 1200, 1800, 2000, 1600, 1700],
+      monthlyEarnings: Number(data.data.totalEarnings || 0),
+      previousMonthEarnings: 0, // You might want to implement actual calculation
+      pendingEarnings: 0, // You might want to implement actual calculation
+      totalServices: Number(data.data.servicesCount || 0),
+      totalReviews: Number(data.data.reviewsCount || 0),
+      averageRating: parseFloat(data.data.averageRating) || 0,
+      unreadMessages: 0,
+    }
+
+    return NextResponse.json(stats)
   } catch (error) {
-    console.error("Error fetching users:", error)
-    return NextResponse.json({ error: "An error occurred while fetching users" }, { status: 500 })
+    console.error("Error fetching user dashboard stats:", error)
+    return NextResponse.json(
+      { error: "An error occurred while fetching user dashboard stats" },
+      { status: 500 }
+    )
   }
 }
-
