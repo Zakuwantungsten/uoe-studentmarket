@@ -37,7 +37,7 @@ const iconMap = {
 }
 
 export default function CategoryCard({ category }: CategoryCardProps) {
-  const { _id, name, count } = category
+  const { _id, name, count, serviceCount } = category
 
   // Determine which icon to use
   const IconComponent = iconMap[name as keyof typeof iconMap] || Book
@@ -50,7 +50,7 @@ export default function CategoryCard({ category }: CategoryCardProps) {
             <IconComponent className="h-6 w-6" />
           </div>
           <h3 className="font-medium">{name}</h3>
-          <p className="text-xs text-muted-foreground">{count || 0} services</p>
+          <p className="text-xs text-muted-foreground">{serviceCount || count || 0} services</p>
         </CardContent>
       </Card>
     </Link>

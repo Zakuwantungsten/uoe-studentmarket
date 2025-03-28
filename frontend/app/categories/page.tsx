@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Search } from "lucide-react"
+import Link from "next/link"
 
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -21,8 +22,16 @@ export default function CategoriesPage() {
       try {
         setIsLoading(true)
         const response = await categoryService.getCategories()
-        setCategories(response.data)
-        setFilteredCategories(response.data)
+        
+        // Ensure we're using the correct property for service counts
+        const categoriesWithCounts = response.data.map(category => ({
+          ...category,
+          // Make sure we preserve the serviceCount from the API
+          count: category.serviceCount || category.count || 0
+        }))
+        
+        setCategories(categoriesWithCounts)
+        setFilteredCategories(categoriesWithCounts)
       } catch (error) {
         handleApiError(error, "Failed to load categories")
       } finally {
@@ -73,12 +82,24 @@ export default function CategoriesPage() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-12">
-            <p className="text-lg font-medium">No categories found</p>
-            <p className="text-muted-foreground">Try a different search term</p>
-            <Button className="mt-4" onClick={() => setSearchQuery("")}>
-              Clear Search
-            </Button>
+          <div className="text-center py-12 max-w-md mx-auto">
+            <div className="bg-muted p-6 rounded-lg shadow-sm mb-6">
+              <p className="text-lg font-medium">No categories found</p>
+              <p className="text-muted-foreground mb-4">Try a different search term</p>
+              <Button className="w-full" onClick={() => setSearchQuery("")}>
+                Clear Search
+              </Button>
+            </div>
+            
+            <div className="bg-primary/5 border border-primary/20 p-6 rounded-lg">
+              <h3 className="text-lg font-medium mb-2">Can't find what you're looking for?</h3>
+              <p className="text-muted-foreground mb-4">
+                If you can't find the category you're looking for, you can offer that service yourself!
+              </p>
+              <Button variant="default" className="w-full" asChild>
+                <Link href="/offer-service">Offer Your Service</Link>
+              </Button>
+            </div>
           </div>
         )}
       </div>
