@@ -26,7 +26,7 @@ export default function EarningsSummary() {
       try {
         setIsLoading(true)
 
-        const response = await apiClient.get<{ success: boolean; data: EarningData }>("/users/earnings-summary", {
+        const response = await apiClient.get<{ success: boolean; data: EarningData }>("/api/users/dashboard-stats", {
           token,
         })
 

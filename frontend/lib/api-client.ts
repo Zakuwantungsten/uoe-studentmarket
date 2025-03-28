@@ -1,6 +1,10 @@
 import { toast } from "@/components/ui/use-toast"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
+// Extract the base URL (without /api) for handling paths that include /api
+const BASE_URL = API_URL.endsWith('/api') 
+  ? API_URL.slice(0, -4) // Remove trailing /api
+  : API_URL
 
 interface FetchOptions extends RequestInit {
   token?: string
@@ -23,7 +27,12 @@ async function fetchApi<T>(endpoint: string, options: FetchOptions = {}): Promis
   const { token, params, ...fetchOptions } = options
 
   // Add query parameters if provided
-  const url = new URL(`${API_URL}${endpoint}`)
+  // Prevent duplicate /api in URL path
+  const urlString = endpoint.startsWith('/api')
+    ? `${BASE_URL}${endpoint}` // If endpoint already has /api, use BASE_URL
+    : `${API_URL}${endpoint}` // Otherwise use API_URL with /api
+    
+  const url = new URL(urlString)
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
       url.searchParams.append(key, value)
