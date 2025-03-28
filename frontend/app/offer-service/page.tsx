@@ -21,7 +21,7 @@ import { apiClient } from "@/lib/api-client"
 import { Category, ApiResponse } from "@/lib/types"
 
 export default function OfferServicePage() {
-  const { user, token } = useAuth()
+  const { user, token, isAuthenticated, isLoading: authLoading } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
@@ -68,6 +68,21 @@ export default function OfferServicePage() {
   const [errors, setErrors] = useState<FormErrors>({})
 
   useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push("/login?redirect=/offer-service")
+      return
+    }
+
+    if (!authLoading && user?.role !== "PROVIDER") {
+      toast({
+        title: "Access denied",
+        description: "Only service providers can offer services",
+        variant: "destructive",
+      })
+      router.push("/dashboard")
+      return
+    }
+
     const fetchCategories = async () => {
       try {
         const response = await categoryService.getCategories()
@@ -83,7 +98,7 @@ export default function OfferServicePage() {
     }
 
     fetchCategories()
-  }, [toast])
+  }, [authLoading, isAuthenticated, user, router, toast])
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target

@@ -47,7 +47,7 @@ export default function CreateServicePage() {
       return
     }
 
-    if (!authLoading && user?.role !== "provider") {
+    if (!authLoading && user?.role !== "PROVIDER") {
       toast({
         title: "Access denied",
         description: "Only service providers can create services",
@@ -112,8 +112,8 @@ export default function CreateServicePage() {
         description: "Your service has been created successfully!",
       })
 
-      // Redirect to the service page
-      router.push(`/services/${response.data._id}`)
+      // Redirect to my services page
+      router.push("/my-services")
     } catch (error) {
       handleApiError(error, "Failed to create service")
     } finally {

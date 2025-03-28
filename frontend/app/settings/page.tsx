@@ -2,9 +2,9 @@
 
 import type React from "react"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { PlusCircle, X, Calendar, Save } from "lucide-react"
+import { PlusCircle, X, Calendar, Save, Upload } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,7 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/contexts/auth-context"
 import { authService } from "@/lib/services/auth-service"
-import { handleApiError } from "@/lib/api-client"
+import { handleApiError, apiClient } from "@/lib/api-client"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 
@@ -24,7 +24,12 @@ export default function SettingsPage() {
   const { user, token, updateUser, isAuthenticated, isLoading: authLoading } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
-
+  
+  // Image upload state
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  
   // Profile form state
   const [name, setName] = useState("")
   const [bio, setBio] = useState("")
@@ -56,7 +61,7 @@ export default function SettingsPage() {
     credentialId?: string
     credentialUrl?: string
   }[]>([])
-
+  
   // Password form state
   const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
@@ -86,6 +91,22 @@ export default function SettingsPage() {
     credentialId: "",
     credentialUrl: ""
   })
+  
+  // Handle image file selection
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    // Preview the image
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+    
+    setImageFile(file)
+    setProfileImage("") // Clear any existing URL when a file is selected
+  }
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -99,6 +120,12 @@ export default function SettingsPage() {
       setPhone(user.phone || "")
       setLocation(user.address || "")
       setProfileImage(user.profileImage || "")
+      
+      // If there's a profile image URL, clear any local image preview
+      if (user.profileImage) {
+        setImagePreview(null)
+      }
+      
       setSkills(user.skills || [])
       setEducationList(user.education || [])
       setCertifications(user.certifications || [])
@@ -161,17 +188,46 @@ export default function SettingsPage() {
     try {
       setIsUpdatingProfile(true)
 
+      // Upload image file if selected
+      let imageUrl = profileImage
+      if (imageFile) {
+        const formData = new FormData()
+        formData.append("file", imageFile)
+        
+        try {
+          // Handle token type with explicit casting
+          const options = token ? { token: token as string } : {}
+          const response = await apiClient.upload("/upload/file", formData, options) as { 
+            success: boolean; 
+            data: { url: string } 
+          }
+          
+          if (response?.success && response?.data?.url) {
+            imageUrl = response.data.url
+          }
+        } catch (error) {
+          console.error("Error uploading profile image:", error)
+          toast({
+            title: "Error",
+            description: "Failed to upload profile image. Profile will be updated with existing image.",
+            variant: "destructive",
+          })
+        }
+      }
+
       const updatedData = {
         name,
         bio,
         phone,
         address: location,
-        profileImage,
+        profileImage: imageUrl,
         skills,
         education: educationList,
         certifications
       }
-
+      
+      // Reset image file state after successful upload
+      setImageFile(null)
       const response = await authService.updateProfile(updatedData, token)
 
       // Update the user in context
@@ -266,7 +322,7 @@ export default function SettingsPage() {
                 <CardContent className="space-y-6">
                   <div className="flex flex-col items-center space-y-4">
                     <Avatar className="h-24 w-24">
-                      <AvatarImage src={profileImage} alt={name} />
+                      <AvatarImage src={imagePreview || profileImage} alt={name} />
                       <AvatarFallback className="text-2xl">
                         {name
                           .split(" ")
@@ -274,14 +330,37 @@ export default function SettingsPage() {
                           .join("")}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="space-y-2">
-                      <Label htmlFor="profileImage">Profile Image URL</Label>
-                      <Input
-                        id="profileImage"
-                        placeholder="https://example.com/your-image.jpg"
-                        value={profileImage}
-                        onChange={(e) => setProfileImage(e.target.value)}
-                      />
+                    <div className="space-y-2 w-full max-w-md">
+                      <Label>Profile Image</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="file"
+                          id="profile-image-upload"
+                          accept="image/*"
+                          ref={fileInputRef}
+                          onChange={handleImageChange}
+                          className="hidden"
+                        />
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          onClick={() => fileInputRef.current?.click()}
+                          className="flex items-center gap-2"
+                        >
+                          <Upload className="h-4 w-4" />
+                          Upload Image
+                        </Button>
+                        <Input
+                          placeholder="Or enter image URL"
+                          value={profileImage}
+                          onChange={(e) => {
+                            setProfileImage(e.target.value)
+                            setImageFile(null)
+                            setImagePreview(null)
+                          }}
+                          className="flex-1"
+                        />
+                      </div>
                     </div>
                   </div>
 
