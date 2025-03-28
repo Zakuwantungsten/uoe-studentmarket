@@ -67,7 +67,6 @@ export default function Header() {
         <div className="flex items-center gap-2">
           <MobileNav />
           <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo.svg" alt="Logo" width={32} height={32} />
             <span className="text-xl font-bold">UoE Marketplace</span>
           </Link>
         </div>
@@ -98,12 +97,6 @@ export default function Header() {
                       <span className="sr-only">Messages</span>
                     </Link>
                   </Button>
-                  <Button variant="ghost" size="icon" asChild>
-                    <Link href="/notifications">
-                      <Bell className="h-5 w-5" />
-                      <span className="sr-only">Notifications</span>
-                    </Link>
-                  </Button>
                 </>
               )}
 
@@ -125,7 +118,7 @@ export default function Header() {
                   </div>
                   <DropdownMenuSeparator />
                   {userNavigation
-                    .filter((item) => !item.providerOnly || user?.role === "provider")
+                    .filter((item) => !item.providerOnly || user?.role === "PROVIDER")
                     .map((item) => (
                       <DropdownMenuItem key={item.name} asChild>
                         <Link href={item.href} className="flex items-center justify-between cursor-pointer">
@@ -137,7 +130,7 @@ export default function Header() {
                         </Link>
                       </DropdownMenuItem>
                     ))}
-                  {user?.role === "admin" && (
+                  {user?.role === "ADMIN" && (
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem asChild>
@@ -194,7 +187,7 @@ export default function Header() {
                   {isAuthenticated ? (
                     <>
                       {userNavigation
-                        .filter((item) => !item.providerOnly || user?.role === "provider")
+                        .filter((item) => !item.providerOnly || user?.role === "PROVIDER")
                         .map((item) => (
                           <Link
                             key={item.name}
@@ -209,7 +202,7 @@ export default function Header() {
                             {item.badge && <Badge>3</Badge>}
                           </Link>
                         ))}
-                      {user?.role === "admin" && (
+                      {user?.role === "ADMIN" && (
                         <Link
                           href="/admin"
                           onClick={closeSheet}

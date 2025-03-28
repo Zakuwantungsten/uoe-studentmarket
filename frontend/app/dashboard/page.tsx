@@ -44,7 +44,7 @@ export default function DashboardPage() {
       try {
         setIsLoading(true)
 
-        const response = await apiClient.get<DashboardStats>("/api/users/dashboard-stats", {
+        const response = await apiClient.get<DashboardStats>("/users/dashboard-stats", {
           token,
         })
 

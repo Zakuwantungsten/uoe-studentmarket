@@ -17,6 +17,8 @@ export function useWebSocket() {
   const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const messageHandlersRef = useRef<Map<string, MessageHandler[]>>(new Map())
+  const reconnectAttemptsRef = useRef<number>(0)
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Initialize WebSocket connection
   const connect = useCallback(() => {
@@ -32,6 +34,8 @@ export function useWebSocket() {
       ws.onopen = () => {
         setStatus("connected")
         console.log("WebSocket connection established")
+        // Reset reconnection attempts on successful connection
+        reconnectAttemptsRef.current = 0
       }
 
       ws.onmessage = (event) => {
@@ -48,8 +52,13 @@ export function useWebSocket() {
         }
       }
 
-      ws.onerror = (error) => {
-        console.error("WebSocket error:", error)
+      ws.onerror = () => {
+        // Only log WebSocket errors in development mode
+        if (process.env.NODE_ENV === 'development') {
+          console.warn(
+            `WebSocket connection error. ReadyState: ${ws.readyState}, URL: ${ws.url.replace(/token=([^&]*)/, "token=REDACTED")}`
+          )
+        }
         setStatus("error")
       }
 
@@ -57,12 +66,28 @@ export function useWebSocket() {
         setStatus("disconnected")
         console.log("WebSocket connection closed")
 
-        // Attempt to reconnect after 5 seconds
-        setTimeout(() => {
+        // Clear any existing reconnection timeout
+        if (reconnectTimeoutRef.current) {
+          clearTimeout(reconnectTimeoutRef.current)
+        }
+
+        // Implement exponential backoff for reconnection
+        reconnectAttemptsRef.current += 1
+        const maxDelay = 30000 // Maximum delay of 30 seconds
+        const baseDelay = 1000 // Start with 1 second
+        const delay = Math.min(maxDelay, baseDelay * Math.pow(2, reconnectAttemptsRef.current - 1))
+        
+        // Only log in development mode
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`WebSocket reconnecting in ${delay / 1000} seconds (attempt ${reconnectAttemptsRef.current})`)
+        }
+
+        // Attempt to reconnect with exponential backoff
+        reconnectTimeoutRef.current = setTimeout(() => {
           if (wsRef.current?.readyState === WebSocket.CLOSED) {
             connect()
           }
-        }, 5000)
+        }, delay)
       }
 
       wsRef.current = ws
@@ -73,7 +98,8 @@ export function useWebSocket() {
         wsRef.current = null
       }
     } catch (error) {
-      console.error("Error connecting to WebSocket:", error)
+      // Provide more descriptive error message for connection errors
+      console.error(`Error connecting to WebSocket: ${error instanceof Error ? error.message : 'Unknown error'}`)
       setStatus("error")
     }
   }, [token])
@@ -114,6 +140,13 @@ export function useWebSocket() {
     }
 
     return () => {
+      // Clear any pending reconnection timeout
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current)
+        reconnectTimeoutRef.current = null
+      }
+      
+      // Close WebSocket connection
       if (wsRef.current) {
         wsRef.current.close()
         wsRef.current = null

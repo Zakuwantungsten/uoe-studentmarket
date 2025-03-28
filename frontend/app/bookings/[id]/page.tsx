@@ -287,5 +287,6 @@ export default function BookingDetailsPage() {
           </CardFooter>
         </Card>
       </div>
-    </div>\
+    </div>
+  
 
