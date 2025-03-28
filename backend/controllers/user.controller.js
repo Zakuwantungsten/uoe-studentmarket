@@ -375,4 +375,51 @@ exports.getRecentActivities = async (req, res) => {
     });
   }
 };
-// === END OF NEW METHOD ===
+
+// Add a new method specifically for dashboard stats
+exports.getDashboardStats = async (req, res) => {
+  try {
+    const userId = req.user.id
+
+    // Get services count
+    const servicesCount = await Service.countDocuments({ provider: userId })
+
+    // Get bookings count
+    const bookingsAsProvider = await Booking.countDocuments({ provider: userId })
+    const bookingsAsCustomer = await Booking.countDocuments({ customer: userId })
+
+    // Get reviews count and average rating
+    const reviewsReceived = await Review.find({ serviceProvider: userId })
+    const reviewsCount = reviewsReceived.length
+    const totalRating = reviewsReceived.reduce((sum, review) => sum + review.rating, 0)
+    const averageRating = reviewsCount > 0 ? (totalRating / reviewsCount).toFixed(1) : 0
+
+    // Get earnings (sum of completed bookings)
+    const completedBookings = await Booking.find({
+      provider: userId,
+      status: "completed",
+    })
+
+    const totalEarnings = completedBookings.reduce((sum, booking) => sum + booking.totalAmount, 0)
+
+    res.status(200).json({
+      success: true,
+      data: {
+        servicesCount,
+        bookingsAsProvider,
+        bookingsAsCustomer,
+        totalBookings: bookingsAsProvider + bookingsAsCustomer,
+        reviewsCount,
+        averageRating,
+        totalEarnings,
+      },
+    })
+  } catch (error) {
+    console.error("Error getting dashboard stats:", error)
+    res.status(500).json({
+      success: false,
+      message: "Error getting dashboard statistics",
+      error: error.message,
+    })
+  }
+}
