@@ -105,6 +105,7 @@ export interface Review {
 }
 
 export interface Booking {
+  paidAt: string
   _id: string
   service: Service
   customer: User
