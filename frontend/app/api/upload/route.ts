@@ -53,8 +53,8 @@ export async function POST(req: Request) {
         // Get the NEXT_PUBLIC_API_URL from env or use default
         const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
         
-        // Upload to backend
-        const response = await fetch(`${API_URL}/file`, {
+        // Upload to backend - using the correct endpoint /upload/file
+        const response = await fetch(`${API_URL}/upload/file`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`

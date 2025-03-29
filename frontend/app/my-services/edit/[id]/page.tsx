@@ -51,7 +51,7 @@ export default function EditServicePage() {
       return
     }
 
-    if (!authLoading && user?.role !== "provider") {
+    if (!authLoading && user?.role !== "PROVIDER") {
       toast({
         title: "Access denied",
         description: "Only service providers can edit services",
@@ -130,6 +130,16 @@ export default function EditServicePage() {
         .split("\n")
         .map((url) => url.trim())
         .filter((url) => url.length > 0)
+      
+      // Get the main image from the array (first one)
+      const mainImage = imagesArray.length > 0 ? imagesArray[0] : "";
+      
+      // Log the image data for debugging
+      console.log("Updating service with image data:", {
+        imagesCount: imagesArray.length,
+        hasMainImage: !!mainImage,
+        mainImageUrl: mainImage || "none"
+      });
 
       const serviceData = {
         title,
@@ -139,6 +149,8 @@ export default function EditServicePage() {
         location,
         categoryId,
         features: featuresArray,
+        // Set both image (string) for backend and images (array) for frontend
+        image: mainImage,
         images: imagesArray,
         availability,
         deliveryTime,

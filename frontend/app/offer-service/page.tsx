@@ -202,20 +202,35 @@ export default function OfferServicePage() {
       }
       
       // Upload image if selected
-      let imageUrl = formData.image
+      let imageUrl = ""
       if (imageFile) {
         const formData = new FormData()
         formData.append("file", imageFile)
         
-        // Only pass token if it exists
-        const options = token ? { token } : {}
-        const response = await apiClient.upload("/upload/file", formData, options) as { 
-          success: boolean; 
-          data: { url: string } 
+        try {
+          // Only pass token if it exists
+          const options = token ? { token } : {}
+          const response = await apiClient.upload("/upload/file", formData, options) as { 
+            success: boolean; 
+            data: { url: string } 
+          }
+          
+          console.log("Upload response:", response);
+          
+          if (response?.success && response?.data?.url) {
+            imageUrl = response.data.url
+            console.log("Successfully uploaded image, URL:", imageUrl)
+          } else {
+            console.error("Upload succeeded but no URL returned:", response)
+          }
+        } catch (uploadError) {
+          console.error("Error uploading image:", uploadError)
+          // Continue with service creation even if image upload fails
         }
-        if (response?.success && response?.data?.url) {
-          imageUrl = response.data.url
-        }
+      } else if (formData.image) {
+        // Use existing image URL if one is set
+        imageUrl = formData.image
+        console.log("Using existing image URL:", imageUrl)
       }
 
       // Format data for API
@@ -224,16 +239,19 @@ export default function OfferServicePage() {
       // Transform features from string array to object array as expected by backend
       const formattedFeatures = formData.features.map(feature => ({ feature }))
       
+      // Ensure we have a final image URL
+      const finalImageUrl = imageUrl || "";
+      
       // Log the image URL for debugging
-      console.log("Image upload URL:", imageUrl);
+      console.log("Final image URL for service:", finalImageUrl);
       
       const serviceData = {
         ...restFormData,
         description: finalDescription,
         location: finalLocation,
-        image: imageUrl,
+        image: finalImageUrl,
         // Add images array for service card compatibility
-        images: imageUrl ? [imageUrl] : [],
+        images: finalImageUrl ? [finalImageUrl] : [],
         price: Number.parseFloat(formData.price),
         discount: formData.discount ? Number.parseInt(formData.discount) : undefined,
         // Map categoryId to category for backend compatibility

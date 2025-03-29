@@ -134,6 +134,16 @@ export default function CreateServicePage() {
             .map(url => url.trim())
             .filter(url => url.length > 0)
 
+      // Make sure we have an image URL to save
+      const finalImageUrl = imageUrl || (allImageUrls.length > 0 ? allImageUrls[0] : "");
+      
+      // Log the image URL for debugging
+      console.log("Image being saved:", {
+        imageUrl, 
+        hasAllImageUrls: allImageUrls.length > 0,
+        finalImageUrl
+      });
+
       const serviceData = {
         title,
         description,
@@ -143,7 +153,7 @@ export default function CreateServicePage() {
         categoryId,
         features: featuresArray,
         // Set both image (for backend) and images (for frontend)
-        image: imageUrl,
+        image: finalImageUrl,
         images: allImageUrls,
         availability,
         deliveryTime,
