@@ -6,6 +6,64 @@ import Link from "next/link"
 import { useParams } from "next/navigation"
 import { MapPin, Calendar, Clock, Star, ChevronLeft, Share2, Heart, MessageSquare } from "lucide-react"
 
+// Helper function to normalize image URLs - same as in service-card.tsx
+const normalizeImageUrl = (url: string | undefined): string | undefined => {
+  if (!url) return undefined;
+  
+  // If already absolute URL with protocol, return as is
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  
+  // Handle URL that includes 'uploads/' but may be missing the leading slash
+  if (url.includes('uploads/') && !url.startsWith('/')) {
+    return `/${url}`;
+  }
+  
+  // If URL has a host but no protocol, add protocol
+  if (url.startsWith('//')) {
+    return `https:${url}`;
+  }
+  
+  // If URL is a relative path without starting slash, add it
+  if (!url.startsWith('/')) {
+    return `/${url}`;
+  }
+  
+  return url;
+};
+
+// Helper function to attempt URL repair if the initial URL fails to load
+const attemptUrlRepair = (url: string): string => {
+  // Skip if it's already a placeholder or empty
+  if (!url || url.includes('placeholder')) {
+    return "/placeholder.svg";
+  }
+  
+  // Extract filename from URL
+  const parts = url.split('/');
+  const filename = parts[parts.length - 1];
+  
+  // Try direct /uploads/ path
+  if (!url.includes('/uploads/')) {
+    return `/uploads/${filename}`;
+  }
+  
+  // If it's a full URL with hostname and uploads, try the relative path
+  if (url.includes('://') && url.includes('/uploads/')) {
+    return `/uploads/${filename}`;
+  }
+  
+  // Try prefixing with API base URL
+  const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || "http://localhost:5000";
+  if (!url.startsWith('http')) {
+    return `${apiBase}${url.startsWith('/') ? url : `/${url}`}`;
+  }
+  
+  // When all else fails, return placeholder
+  return "/placeholder.svg";
+};
+
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
@@ -108,10 +166,25 @@ export default function ServiceDetailsPage() {
           <div className="space-y-4">
             <div className="relative aspect-video overflow-hidden rounded-lg border">
               <Image
-                src={selectedImage || service.images?.[0] || "/placeholder.svg?height=400&width=800"}
+                src={normalizeImageUrl(selectedImage || service.images?.[0]) || "/placeholder.svg?height=400&width=800"}
                 alt={service.title}
                 fill
                 className="object-cover"
+                onError={(e) => {
+                  // If image fails to load, try alternate URL format before using placeholder
+                  const img = e.target as HTMLImageElement;
+                  const origSrc = img.src;
+                  
+                  if ((selectedImage || service.images?.[0]) && !origSrc.includes("placeholder.svg")) {
+                    // Try alternate URL format
+                    const alternateUrl = attemptUrlRepair(selectedImage || service.images?.[0] || "");
+                    console.error("Image failed to load, trying alternate format:", alternateUrl);
+                    img.src = alternateUrl;
+                  } else {
+                    // Fall back to placeholder
+                    img.src = "/placeholder.svg?height=400&width=800";
+                  }
+                }}
               />
             </div>
             {service.images && service.images.length > 1 && (
@@ -125,10 +198,19 @@ export default function ServiceDetailsPage() {
                     onClick={() => setSelectedImage(image)}
                   >
                     <Image
-                      src={image || "/placeholder.svg"}
+                      src={normalizeImageUrl(image) || "/placeholder.svg"}
                       alt={`${service.title} ${index + 1}`}
                       fill
                       className="object-cover"
+                      onError={(e) => {
+                        // If thumbnail fails to load, try alternate format
+                        const img = e.target as HTMLImageElement;
+                        if (image && !img.src.includes("placeholder")) {
+                          img.src = attemptUrlRepair(image);
+                        } else {
+                          img.src = "/placeholder.svg";
+                        }
+                      }}
                     />
                   </div>
                 ))}

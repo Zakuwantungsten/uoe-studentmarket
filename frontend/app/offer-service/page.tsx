@@ -224,6 +224,9 @@ export default function OfferServicePage() {
       // Transform features from string array to object array as expected by backend
       const formattedFeatures = formData.features.map(feature => ({ feature }))
       
+      // Log the image URL for debugging
+      console.log("Image upload URL:", imageUrl);
+      
       const serviceData = {
         ...restFormData,
         description: finalDescription,
@@ -239,8 +242,19 @@ export default function OfferServicePage() {
         features: formattedFeatures,
       }
 
+      // Log the service data being sent
+      console.log("Creating service with data:", {
+        ...serviceData,
+        image: serviceData.image ? 'Image URL present' : 'No image URL',
+        imageLength: serviceData.image ? serviceData.image.length : 0,
+        imageType: serviceData.image ? typeof serviceData.image : 'undefined'
+      });
+
       // Use type assertion to resolve TypeScript error
-      await serviceService.createService(serviceData as any, token as string)
+      const response = await serviceService.createService(serviceData as any, token as string);
+      
+      // Log the response to see what was actually saved
+      console.log("Service creation response:", response);
 
       toast({
         title: "Success",

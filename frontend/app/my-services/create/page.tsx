@@ -2,10 +2,10 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ChevronLeft } from "lucide-react"
+import { ChevronLeft, Upload } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,7 +18,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { categoryService } from "@/lib/services/category-service"
 import { serviceService } from "@/lib/services/service-service"
 import type { Category } from "@/lib/types"
-import { handleApiError } from "@/lib/api-client"
+import { handleApiError, apiClient } from "@/lib/api-client"
 import { useEffect } from "react"
 
 export default function CreateServicePage() {
@@ -36,6 +36,9 @@ export default function CreateServicePage() {
   const [imageUrls, setImageUrls] = useState("")
   const [availability, setAvailability] = useState("")
   const [deliveryTime, setDeliveryTime] = useState("")
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [categories, setCategories] = useState<Category[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -72,6 +75,20 @@ export default function CreateServicePage() {
     fetchCategories()
   }, [authLoading, isAuthenticated, user, router, toast])
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Preview the image
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+    
+    setImageFile(file)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -86,11 +103,36 @@ export default function CreateServicePage() {
         .map((feature) => feature.trim())
         .filter((feature) => feature.length > 0)
 
-      // Parse image URLs from newline-separated string to array
-      const imagesArray = imageUrls
-        .split("\n")
-        .map((url) => url.trim())
-        .filter((url) => url.length > 0)
+      // Try to upload image file if available
+      let imageUrl = ""
+      if (imageFile) {
+        const formData = new FormData()
+        formData.append("file", imageFile)
+        
+        // Only pass token if it exists
+        const options = token ? { token } : {}
+        const response = await apiClient.upload("/upload/file", formData, options) as { 
+          success: boolean; 
+          data: { url: string } 
+        }
+        if (response?.success && response?.data?.url) {
+          imageUrl = response.data.url
+        }
+      } else if (imageUrls.trim()) {
+        // Use the first URL from the textarea if no file uploaded
+        imageUrl = imageUrls
+          .split("\n")
+          .map(url => url.trim())
+          .filter(url => url.length > 0)[0] || ""
+      }
+
+      // Get all image URLs (for compatibility with frontend UI)
+      const allImageUrls = imageUrl 
+        ? [imageUrl] 
+        : imageUrls
+            .split("\n")
+            .map(url => url.trim())
+            .filter(url => url.length > 0)
 
       const serviceData = {
         title,
@@ -100,7 +142,9 @@ export default function CreateServicePage() {
         location,
         categoryId,
         features: featuresArray,
-        images: imagesArray,
+        // Set both image (for backend) and images (for frontend)
+        image: imageUrl,
+        images: allImageUrls,
         availability,
         deliveryTime,
       }
@@ -247,7 +291,40 @@ export default function CreateServicePage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="imageUrls">Image URLs (one per line)</Label>
+                <Label htmlFor="image">Service Image</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="image"
+                    name="image"
+                    type="file"
+                    accept="image/*"
+                    ref={fileInputRef}
+                    onChange={handleImageChange}
+                    className="hidden"
+                  />
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-2"
+                  >
+                    <Upload className="h-4 w-4" />
+                    Upload Image
+                  </Button>
+                </div>
+                
+                {imagePreview && (
+                  <div className="mt-2">
+                    <p className="text-sm mb-2">Image Preview:</p>
+                    <img 
+                      src={imagePreview} 
+                      alt="Preview" 
+                      className="max-w-full h-auto max-h-48 rounded-md border" 
+                    />
+                  </div>
+                )}
+                
+                <p className="text-xs text-muted-foreground mt-2">Or add image URLs below (one per line)</p>
                 <Textarea
                   id="imageUrls"
                   placeholder="https://example.com/image1.jpg&#10;https://example.com/image2.jpg"
@@ -256,7 +333,7 @@ export default function CreateServicePage() {
                   rows={3}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Add one image URL per line. The first image will be the main image.
+                  The first image will be used as the main image.
                 </p>
               </div>
 

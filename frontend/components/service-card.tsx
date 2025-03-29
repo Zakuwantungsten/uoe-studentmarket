@@ -8,6 +8,64 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import type { Service } from "@/lib/types"
 
+// Helper function to normalize image URLs
+const normalizeImageUrl = (url: string | undefined): string | undefined => {
+  if (!url) return undefined;
+  
+  // If already absolute URL with protocol, return as is
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  
+  // Handle URL that includes 'uploads/' but may be missing the leading slash
+  if (url.includes('uploads/') && !url.startsWith('/')) {
+    return `/${url}`;
+  }
+  
+  // If URL has a host but no protocol, add protocol
+  if (url.startsWith('//')) {
+    return `https:${url}`;
+  }
+  
+  // If URL is a relative path without starting slash, add it
+  if (!url.startsWith('/')) {
+    return `/${url}`;
+  }
+  
+  return url;
+};
+
+// Helper function to attempt URL repair if the initial URL fails to load
+const attemptUrlRepair = (url: string): string => {
+  // Skip if it's already a placeholder or empty
+  if (!url || url.includes('placeholder')) {
+    return "/placeholder.svg?height=200&width=400";
+  }
+  
+  // Extract filename from URL
+  const parts = url.split('/');
+  const filename = parts[parts.length - 1];
+  
+  // Try direct /uploads/ path
+  if (!url.includes('/uploads/')) {
+    return `/uploads/${filename}`;
+  }
+  
+  // If it's a full URL with hostname and uploads, try the relative path
+  if (url.includes('://') && url.includes('/uploads/')) {
+    return `/uploads/${filename}`;
+  }
+  
+  // Try prefixing with API base URL
+  const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || "http://localhost:5000";
+  if (!url.startsWith('http')) {
+    return `${apiBase}${url.startsWith('/') ? url : `/${url}`}`;
+  }
+  
+  // When all else fails, return placeholder
+  return "/placeholder.svg?height=200&width=400";
+};
+
 interface ServiceCardProps {
   service: Service
   featured?: boolean
@@ -34,12 +92,42 @@ export default function ServiceCard({ service, featured = false }: ServiceCardPr
   return (
     <Card className={`overflow-hidden transition-all hover:shadow-md ${featured ? "border-primary/50" : ""}`}>
       <div className="relative">
+        {/* Log image information for debugging */}
+        {process.env.NODE_ENV === 'development' && (() => {
+          // Get the image URL
+          const imageUrl = images?.[0] || null;
+          
+          console.log("Service card image data:", { 
+            hasImages: !!images, 
+            imageCount: images?.length || 0,
+            firstImage: imageUrl || 'none',
+            serviceId: _id
+          });
+          return null;
+        })()}
+        
         <Image
-          src={images?.[0] || "/placeholder.svg?height=200&width=400"}
+          src={normalizeImageUrl(images?.[0]) || "/placeholder.svg?height=200&width=400"}
           alt={title}
           width={400}
           height={200}
           className="w-full h-48 object-cover"
+          onError={(e) => {
+            // If image fails to load, try alternate URL format before using placeholder
+            const img = e.target as HTMLImageElement;
+            const origSrc = img.src;
+            
+            if (images?.[0] && !origSrc.includes("placeholder.svg")) {
+              // Try alternate URL format (e.g., if absolute URL fails, try relative)
+              const alternateUrl = attemptUrlRepair(images[0]);
+              console.error("Image failed to load, trying alternate format:", alternateUrl);
+              img.src = alternateUrl;
+            } else {
+              // Fall back to placeholder
+              console.error("Image failed completely, using placeholder:", origSrc);
+              img.src = "/placeholder.svg?height=200&width=400";
+            }
+          }}
         />
         {isPromoted && <Badge className="absolute top-2 right-2 bg-primary">Featured</Badge>}
         {discount && (
