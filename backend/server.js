@@ -41,6 +41,9 @@ const discussionRoutes = require("./routes/discussion.routes")
 const commentRoutes = require("./routes/comment.routes")
 const eventRoutes = require("./routes/event.routes")
 const groupRoutes = require("./routes/group.routes")
+const announcementRoutes = require("./routes/announcement.routes")
+const supportTicketRoutes = require("./routes/supportTicket.routes")
+const bulkNotificationRoutes = require("./routes/bulkNotification.routes")
 
 // Use routes
 app.use("/api/auth", authRoutes)
@@ -58,6 +61,9 @@ app.use("/api/discussions", discussionRoutes)
 app.use("/api/comments", commentRoutes)
 app.use("/api/events", eventRoutes)
 app.use("/api/groups", groupRoutes)
+app.use("/api/announcements", announcementRoutes)
+app.use("/api/support-tickets", supportTicketRoutes)
+app.use("/api/bulk-notifications", bulkNotificationRoutes)
 
 // Root route
 app.get("/", (req, res) => {

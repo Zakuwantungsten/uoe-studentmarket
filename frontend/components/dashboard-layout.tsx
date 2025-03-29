@@ -56,10 +56,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const adminNavigation = [
     { name: "Admin Dashboard", href: "/admin", icon: BarChart },
-    { name: "Users", href: "/admin/users", icon: Users },
-    { name: "Services", href: "/admin/services", icon: ShoppingBag },
+    { name: "User Management", href: "/admin/users", icon: Users },
+    { name: "Service Management", href: "/admin/services", icon: ShoppingBag },
     { name: "Bookings", href: "/admin/bookings", icon: Calendar },
-    { name: "Reports", href: "/admin/reports", icon: FileText },
+    { name: "Dispute Resolution", href: "/admin/disputes", icon: MessageSquare },
+    { name: "Review Control", href: "/admin/reviews", icon: Star },
+    { name: "Financial Management", href: "/admin/finance", icon: PlusCircle },
+    { name: "Analytics & Reports", href: "/admin/reports", icon: FileText },
+    { name: "System Settings", href: "/admin/settings", icon: Settings },
+    { name: "Communication Tools", href: "/admin/communication", icon: Bell },
   ]
 
   const NavLinks = () => (

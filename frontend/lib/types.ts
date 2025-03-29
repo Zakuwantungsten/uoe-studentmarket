@@ -181,6 +181,115 @@ export interface Report {
   endDate: string
 }
 
+// Communication types
+export interface Announcement {
+  _id: string;
+  title: string;
+  description: string;
+  type: 'info' | 'warning' | 'critical' | 'error' | 'success';
+  status: 'active' | 'inactive';
+  targetPages?: string[];
+  displayLocation?: string;
+  startDate?: string;
+  endDate?: string;
+  expiryDate?: string;
+  createdBy: {
+    _id: string;
+    name: string;
+    email: string;
+    image?: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SupportTicket {
+  _id: string;
+  ticketId: string;
+  subject: string;
+  description: string;
+  category: string;
+  status: 'open' | 'in-progress' | 'resolved' | 'closed';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  user: {
+    _id: string;
+    name: string;
+    email: string;
+    image?: string;
+  };
+  assignedTo?: {
+    _id: string;
+    name: string;
+    email: string;
+    image?: string;
+  };
+  messages: TicketMessage[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TicketMessage {
+  _id: string;
+  sender: {
+    _id: string;
+    name: string;
+    email: string;
+    image?: string;
+    role?: string;
+  };
+  content: string;
+  attachments?: string[];
+  read: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TicketStats {
+  open: number;
+  resolvedToday: number;
+  averageResponseTime: string | number;
+}
+
+// Data interface for ticket response/message submission
+export interface TicketMessageData {
+  responseText: string;
+  status: 'in-progress' | 'resolved' | 'closed';
+}
+
+// Data interface for ticket response from API
+export interface TicketResponseData {
+  content: string;
+  message?: string; // Added for backward compatibility
+  status: 'in-progress' | 'resolved' | 'closed';
+}
+
+// Data interface for ticket creation
+export interface TicketCreateData {
+  userEmail: string;
+  subject: string;
+  description?: string; // Added to match API expectation
+  category: string;
+  message: string;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+}
+
+export interface BulkNotification {
+  _id: string;
+  title: string;
+  content: string;
+  recipientType: 'all' | 'providers' | 'customers' | 'inactive' | 'custom';
+  status: 'draft' | 'scheduled' | 'sent' | 'cancelled';
+  notificationType: 'email' | 'in-app' | 'both';
+  createdBy: {
+    _id: string;
+    name: string;
+    email: string;
+    image?: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Map for category icons
 export const categoryIconMap: Record<string, LucideIcon> = {}
 
