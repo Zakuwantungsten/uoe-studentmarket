@@ -7,8 +7,33 @@ exports.sendMessage = async (req, res) => {
   try {
     const { recipientId, content } = req.body
 
+    // Safely convert user IDs to ObjectId
+    let senderObjectId;
+    try {
+      senderObjectId = new mongoose.Types.ObjectId(req.user.id);
+    } catch (error) {
+      console.error("Invalid ObjectId format for sender:", error);
+      return res.status(400).json({
+        success: false,
+        message: "Invalid sender ID format",
+        error: error.message,
+      });
+    }
+
+    let recipientObjectId;
+    try {
+      recipientObjectId = new mongoose.Types.ObjectId(recipientId);
+    } catch (error) {
+      console.error("Invalid ObjectId format for recipient:", error);
+      return res.status(400).json({
+        success: false,
+        message: "Invalid recipient ID format",
+        error: error.message,
+      });
+    }
+
     // Check if recipient exists
-    const recipient = await User.findById(recipientId)
+    const recipient = await User.findById(recipientObjectId)
     if (!recipient) {
       return res.status(404).json({
         success: false,
@@ -18,8 +43,8 @@ exports.sendMessage = async (req, res) => {
 
     // Create message
     const message = await Message.create({
-      sender: req.user.id,
-      recipient: recipientId,
+      sender: senderObjectId,
+      recipient: recipientObjectId,
       content,
     })
 
@@ -49,8 +74,33 @@ exports.getConversation = async (req, res) => {
     const limit = Number.parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
     
+    // Safely convert user IDs to ObjectId
+    let userObjectId;
+    try {
+      userObjectId = new mongoose.Types.ObjectId(req.user.id);
+    } catch (error) {
+      console.error("Invalid ObjectId format for current user:", error);
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID format",
+        error: error.message,
+      });
+    }
+
+    let recipientObjectId;
+    try {
+      recipientObjectId = new mongoose.Types.ObjectId(userId);
+    } catch (error) {
+      console.error("Invalid ObjectId format for recipient:", error);
+      return res.status(400).json({
+        success: false,
+        message: "Invalid recipient ID format",
+        error: error.message,
+      });
+    }
+    
     // Check if user exists
-    const user = await User.findById(userId);
+    const user = await User.findById(recipientObjectId);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -61,8 +111,8 @@ exports.getConversation = async (req, res) => {
     // Get messages
     const messages = await Message.find({
       $or: [
-        { sender: req.user.id, recipient: userId },
-        { sender: userId, recipient: req.user.id }
+        { sender: userObjectId, recipient: recipientObjectId },
+        { sender: recipientObjectId, recipient: userObjectId }
       ]
     })
       .populate('sender', 'name image')
@@ -74,8 +124,8 @@ exports.getConversation = async (req, res) => {
     // Get total count for pagination
     const total = await Message.countDocuments({
       $or: [
-        { sender: req.user.id, recipient: userId },
-        { sender: userId, recipient: req.user.id }
+        { sender: userObjectId, recipient: recipientObjectId },
+        { sender: recipientObjectId, recipient: userObjectId }
       ]
     });
 
@@ -111,11 +161,30 @@ exports.getConversation = async (req, res) => {
 exports.getConversations = async (req, res) =>
 {
   try {
+    // Safely convert user ID to ObjectId
+    let userObjectId;
+    try {
+      userObjectId = new mongoose.Types.ObjectId(req.user.id);
+    } catch (error) {
+      console.error("Invalid ObjectId format:", error);
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID format",
+        error: error.message,
+      });
+    }
+
+    // Convert userObjectId to string for comparisons
+    const userIdStr = userObjectId.toString();
+
     // Get latest message from each conversation
     const conversations = await Message.aggregate([
       {
         $match: {
-          $or: [{ sender: mongoose.Types.ObjectId(req.user.id) }, { recipient: mongoose.Types.ObjectId(req.user.id) }],
+          $or: [
+            { sender: userObjectId },
+            { recipient: userObjectId }
+          ],
         },
       },
       {
@@ -124,21 +193,28 @@ exports.getConversations = async (req, res) =>
       {
         $group: {
           _id: {
-            $cond: [{ $eq: ["$sender", mongoose.Types.ObjectId(req.user.id)] }, "$recipient", "$sender"],
+            $cond: {
+              if: { $eq: [{ $toString: "$sender" }, userIdStr] },
+              then: "$recipient",
+              else: "$sender"
+            }
           },
           lastMessage: { $first: "$$ROOT" },
           unreadCount: {
             $sum: {
-              $cond: [
-                {
-                  $and: [{ $eq: ["$recipient", mongoose.Types.ObjectId(req.user.id)] }, { $eq: ["$read", false] }],
+              $cond: {
+                if: {
+                  $and: [
+                    { $eq: [{ $toString: "$recipient" }, userIdStr] },
+                    { $eq: ["$read", false] }
+                  ]
                 },
-                1,
-                0,
-              ],
-            },
-          },
-        },
+                then: 1,
+                else: 0
+              }
+            }
+          }
+        }
       },
       {
         $lookup: {
@@ -184,8 +260,34 @@ exports.getConversations = async (req, res) =>
 // Delete a message
 exports.deleteMessage = async (req, res) => {
   try {
+    // Safely convert message ID to ObjectId
+    let messageObjectId;
+    try {
+      messageObjectId = new mongoose.Types.ObjectId(req.params.id);
+    } catch (error) {
+      console.error("Invalid ObjectId format for message:", error);
+      return res.status(400).json({
+        success: false,
+        message: "Invalid message ID format",
+        error: error.message,
+      });
+    }
+
+    // Safely convert user ID to ObjectId
+    let userObjectId;
+    try {
+      userObjectId = new mongoose.Types.ObjectId(req.user.id);
+    } catch (error) {
+      console.error("Invalid ObjectId format for user:", error);
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID format",
+        error: error.message,
+      });
+    }
+
     // Find message
-    const message = await Message.findById(req.params.id)
+    const message = await Message.findById(messageObjectId)
 
     if (!message) {
       return res.status(404).json({
@@ -195,7 +297,7 @@ exports.deleteMessage = async (req, res) => {
     }
 
     // Check if user is the sender
-    if (message.sender.toString() !== req.user.id) {
+    if (message.sender.toString() !== userObjectId.toString()) {
       return res.status(403).json({
         success: false,
         message: "Not authorized to delete this message",
@@ -203,7 +305,7 @@ exports.deleteMessage = async (req, res) => {
     }
 
     // Delete message
-    await Message.findByIdAndDelete(req.params.id)
+    await Message.findByIdAndDelete(messageObjectId)
 
     res.status(200).json({
       success: true,
@@ -222,9 +324,22 @@ exports.deleteMessage = async (req, res) => {
 // Get unread messages count
 exports.getUnreadCount = async (req, res) => {
   try {
+    // Safely convert user ID to ObjectId
+    let userObjectId;
+    try {
+      userObjectId = new mongoose.Types.ObjectId(req.user.id);
+    } catch (error) {
+      console.error("Invalid ObjectId format for user:", error);
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID format",
+        error: error.message,
+      });
+    }
+
     // Get unread messages count
     const unreadCount = await Message.countDocuments({
-      recipient: req.user.id,
+      recipient: userObjectId,
       read: false,
     })
 
@@ -247,9 +362,34 @@ exports.markConversationAsRead = async (req, res) => {
   try {
     const { userId } = req.params
 
+    // Safely convert user IDs to ObjectId
+    let userObjectId;
+    try {
+      userObjectId = new mongoose.Types.ObjectId(req.user.id);
+    } catch (error) {
+      console.error("Invalid ObjectId format for current user:", error);
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID format",
+        error: error.message,
+      });
+    }
+
+    let senderObjectId;
+    try {
+      senderObjectId = new mongoose.Types.ObjectId(userId);
+    } catch (error) {
+      console.error("Invalid ObjectId format for sender:", error);
+      return res.status(400).json({
+        success: false,
+        message: "Invalid sender ID format",
+        error: error.message,
+      });
+    }
+
     // Update messages
     const result = await Message.updateMany(
-      { sender: userId, recipient: req.user.id, read: false },
+      { sender: senderObjectId, recipient: userObjectId, read: false },
       { $set: { read: true, readAt: Date.now() } },
     )
 

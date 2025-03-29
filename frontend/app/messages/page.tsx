@@ -64,12 +64,56 @@ export default function MessagesPage() {
         const response = await messageService.getConversations(token)
         setConversations(response.data)
 
-        // If there's a recipient ID in the URL, select that conversation
+        // If there's a recipient ID in the URL, select that conversation or start a new one
         if (recipientId) {
-          const conversation = response.data.find((c) => c.user._id === recipientId)
-          if (conversation) {
-            setSelectedUser(conversation.user)
-            fetchMessages(conversation.user._id)
+          // First check if we already have a conversation with this recipient
+          const existingConversation = response.data.find((c) => c.user._id === recipientId)
+          
+          if (existingConversation) {
+            // Use existing conversation
+            setSelectedUser(existingConversation.user)
+            fetchMessages(existingConversation.user._id)
+          } else {
+              // We need to fetch the recipient user details to start a new conversation
+              // Use the backend API endpoint instead of the Next.js API route
+              try {
+                // Create API URL using the backend API_URL from environment or default
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+                const userResponse = await fetch(`${apiUrl}/users/${recipientId}`, {
+                  headers: {
+                    'Authorization': `Bearer ${token}`
+                  }
+                });
+                
+                if (userResponse.ok) {
+                  const userData = await userResponse.json();
+                  if (userData.success && userData.data) {
+                    // Set the selected user to start a new conversation
+                    setSelectedUser(userData.data);
+                    // Initialize with empty messages
+                    setMessages([]);
+                  } else {
+                    toast({
+                      title: "Unable to load user details",
+                      description: "Please try again or select an existing conversation",
+                      variant: "destructive"
+                    });
+                  }
+                } else {
+                  toast({
+                    title: "Failed to load user details",
+                    description: "Cannot start a new conversation at this time",
+                    variant: "destructive"
+                  });
+                }
+              } catch (error) {
+                console.error("Error fetching recipient user details:", error);
+                toast({
+                  title: "Error",
+                  description: "Failed to load recipient details. Please try again.",
+                  variant: "destructive"
+                });
+              }
           }
         }
       } catch (error) {

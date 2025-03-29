@@ -453,11 +453,11 @@ export default function ServiceDetailsPage() {
                   {service.provider?.bio || "No bio available."}
                 </p>
                 <div className="flex gap-2">
-                  <Button asChild variant="outline" className="w-full">
+                  <Button asChild variant="outline" className="flex-1">
                     <Link href={`/profile/${service.provider?._id}`}>View Profile</Link>
                   </Button>
                   {isAuthenticated && user?._id !== service.provider?._id && (
-                    <Button asChild className="w-full">
+                    <Button asChild className="flex-1">
                       <Link href={`/messages?recipient=${service.provider?._id}`}>
                         <MessageSquare className="mr-2 h-4 w-4" />
                         Contact
