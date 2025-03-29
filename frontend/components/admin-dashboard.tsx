@@ -1,7 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -41,8 +43,8 @@ import {
 } from "lucide-react"
 import { saveAs } from "file-saver"
 import * as XLSX from "xlsx"
-import { apiClient, handleApiError } from "@/lib/api-client"
 import { useAuth } from "@/contexts/auth-context"
+import * as AdminService from "@/lib/services/admin-service"
 import { BarChart, Bar, LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from "recharts"
 
 // Chart colors
@@ -314,185 +316,323 @@ const ReportTable = ({ data, columns }: ReportTableProps) => {
 // Main Admin Dashboard Component
 const AdminDashboard = () => {
   const { token } = useAuth()
-  const [adminData, setAdminData] = useState<AdminData>({
-    totalUsers: 0,
-    totalServices: 0,
-    totalBookings: 0,
-    totalEarnings: 0,
-    newUsersToday: 0,
-    newServicesToday: 0,
-    bookingsToday: 0,
-    pendingBookings: 0,
-    completedBookings: 0,
-  })
-  const [isLoading, setIsLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [timeframe, setTimeframe] = useState("week")
-  const [alerts, setAlerts] = useState([
-    {
-      id: "alert1",
-      title: "Scheduled Maintenance",
-      description: "System will undergo maintenance on Sunday, 4:00 AM - 6:00 AM EAT",
-      severity: "info"
-    }
-  ])
   
-  // Recent activity
-  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([
-    {
-      id: "act1",
-      type: "signup",
-      description: "New user registered",
-      user: { id: "u1", name: "James Mwangi" },
-      timestamp: "10 minutes ago"
+  // React Query hooks for fetching data
+  const { 
+    data: adminData = {
+      totalUsers: 0,
+      totalServices: 0,
+      totalBookings: 0,
+      totalEarnings: 0,
+      newUsersToday: 0,
+      newServicesToday: 0,
+      bookingsToday: 0,
+      pendingBookings: 0,
+      completedBookings: 0,
     },
-    {
-      id: "act2",
-      type: "booking",
-      description: "New booking created",
-      user: { id: "u2", name: "Sarah Wanjiku" },
-      timestamp: "35 minutes ago",
-      status: "Pending"
-    },
-    {
-      id: "act3",
-      type: "service",
-      description: "New service listed",
-      user: { id: "u3", name: "David Kimani" },
-      timestamp: "2 hours ago",
-      status: "Pending Approval"
-    },
-    {
-      id: "act4",
-      type: "admin",
-      description: "Service approval",
-      user: { id: "u4", name: "Admin User" },
-      timestamp: "3 hours ago",
-      status: "Approved"
-    },
-    {
-      id: "act5",
-      type: "system",
-      description: "System backup completed",
-      timestamp: "5 hours ago"
-    }
-  ])
-  
-  // Mock data for flagged content
-  const [flaggedContent, setFlaggedContent] = useState([
-    {
-      id: "r1",
-      type: "review",
-      content: "This service is a scam! Avoid at all costs!",
-      reporter: "John Doe",
-      reported: "Jane Smith",
-      date: "Aug 15, 2023",
-      status: "Pending",
-      actions: ['delete', 'ban']
-    },
-    {
-      id: "r2",
-      type: "service",
-      content: "Get exam answers guaranteed!",
-      reporter: "Admin System",
-      reported: "Peter Parker",
-      date: "Aug 14, 2023",
-      status: "Pending",
-      actions: ['delete', 'ban']
-    },
-    {
-      id: "r3",
-      type: "message",
-      content: "Inappropriate content in message",
-      reporter: "Mary Johnson",
-      reported: "Bob Brown",
-      date: "Aug 10, 2023",
-      status: "Pending",
-      actions: ['delete', 'ban']
-    }
-  ])
-  
-  // Mock data for disputes
-  const [disputes, setDisputes] = useState([
-    {
-      id: "d1",
-      service: "Math Tutoring",
-      customer: "Alice Smith",
-      provider: "Bob Johnson",
-      amount: "KSh 1,500",
-      date: "Aug 16, 2023",
-      issue: "Service not provided as described",
-      status: "Open",
-      actions: ['ban']
-    },
-    {
-      id: "d2",
-      service: "Essay Writing",
-      customer: "Charles Brown",
-      provider: "Diana White",
-      amount: "KSh 2,000",
-      date: "Aug 14, 2023",
-      issue: "Refund requested",
-      status: "In Mediation",
-      actions: ['ban']
-    }
-  ])
+    isLoading: isDashboardLoading
+  } = useQuery({
+    queryKey: ['adminDashboard', timeframe],
+    queryFn: () => AdminService.getDashboardStats(timeframe, token || undefined),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
 
-  // Revenue chart data
-  const [revenueData, setRevenueData] = useState([
-    { name: 'Mon', revenue: 1500 },
-    { name: 'Tue', revenue: 2300 },
-    { name: 'Wed', revenue: 2000 },
-    { name: 'Thu', revenue: 2780 },
-    { name: 'Fri', revenue: 3090 },
-    { name: 'Sat', revenue: 2390 },
-    { name: 'Sun', revenue: 1490 },
-  ])
+  // Fetch recent activity
+  const {
+    data: recentActivity = [],
+    isLoading: isActivityLoading
+  } = useQuery({
+    queryKey: ['adminActivity'],
+    queryFn: () => AdminService.getRecentActivity(token || undefined),
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  })
   
-  // Category distribution data
-  const [categoryData, setCategoryData] = useState([
-    { name: 'Tutoring', value: 45 },
-    { name: 'Food Delivery', value: 20 },
-    { name: 'Laundry', value: 15 },
-    { name: 'Design', value: 10 },
-    { name: 'IT Services', value: 10 },
-  ])
+  // Fetch revenue data
+  const {
+    data: revenueData = [],
+    isLoading: isRevenueLoading
+  } = useQuery({
+    queryKey: ['adminRevenue', timeframe],
+    queryFn: () => AdminService.getRevenueData(timeframe, token || undefined),
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  })
   
-  // Fetch admin data
-  useEffect(() => {
-    const fetchAdminData = async () => {
-      if (!token) return
+  // Fetch category data
+  const {
+    data: categoryData = [],
+    isLoading: isCategoryLoading
+  } = useQuery({
+    queryKey: ['adminCategories'],
+    queryFn: () => AdminService.getCategoryDistribution(token || undefined),
+    staleTime: 30 * 60 * 1000, // 30 minutes
+  })
+  
+  // Fetch pending services
+  const {
+    data: pendingServices = [],
+    isLoading: isPendingServicesLoading
+  } = useQuery({
+    queryKey: ['pendingServices'],
+    queryFn: () => AdminService.getPendingServices(token || undefined),
+    staleTime: 1 * 60 * 1000, // 1 minute
+  })
+  
+  // Fetch flagged content
+  const {
+    data: flaggedContent = [],
+    isLoading: isFlaggedReviewsLoading
+  } = useQuery({
+    queryKey: ['flaggedContent'],
+    queryFn: () => AdminService.getFlaggedContent(token || undefined),
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  })
+  
+  // Fetch disputes
+  const {
+    data: disputes = [],
+    isLoading: isDisputesLoading
+  } = useQuery({
+    queryKey: ['disputes'],
+    queryFn: () => AdminService.getDisputes({}, token || undefined),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+  
+  // Fetch dispute stats
+  const {
+    data: disputeStats = [],
+    isLoading: isDisputeStatsLoading
+  } = useQuery({
+    queryKey: ['disputeStats'],
+    queryFn: () => AdminService.getDisputeStats(token || undefined),
+    staleTime: 15 * 60 * 1000, // 15 minutes
+  })
+  
+  // Fetch system alerts
+  const {
+    data: alerts = [],
+    isLoading: isAlertsLoading
+  } = useQuery({
+    queryKey: ['systemAlerts'],
+    queryFn: () => AdminService.getSystemAlerts(token || undefined),
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  })
 
-      try {
-        setIsLoading(true)
-        const response = await apiClient.get<{ success: boolean; data: AdminData }>("/admin/dashboard", { token })
-        
-        // Check if response has the expected structure
-        if (response.success && response.data) {
-          setAdminData(response.data)
-          
-          // Create derived data for charts
-          if (response.data.bookingsByStatus) {
-            const statusData = response.data.bookingsByStatus.map(item => ({
-              name: item.status,
-              value: item._count
-            }))
-            // Update state variables if needed
-          }
-        } else {
-          console.error("Unexpected API response structure:", response)
-          handleApiError(new Error("Unexpected API response structure"), "Failed to load admin dashboard data")
-        }
-      } catch (error) {
-        handleApiError(error, "Failed to load admin dashboard data")
-      } finally {
-        setIsLoading(false)
+  // Define response types for API data
+  interface ApiResponse<T> {
+    data: T[];
+    totalCount?: number;
+    currentPage?: number;
+    totalPages?: number;
+  }
+
+  interface UserData {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    status?: string;
+    createdAt: string;
+    image?: string;
+  }
+
+  interface ServiceData {
+    id: string;
+    title: string;
+    description: string;
+    price: number;
+    status: string;
+    provider?: {
+      id: string;
+      name: string;
+    };
+    category?: {
+      id: string;
+      name: string;
+    };
+    featured?: boolean;
+    createdAt: string;
+  }
+
+  // Fetch users data
+  const {
+    data: usersData = { data: [] } as ApiResponse<UserData>,
+    isLoading: isUsersLoading
+  } = useQuery<ApiResponse<UserData>>({
+    queryKey: ['adminUsers'],
+    queryFn: async () => {
+      const result = await AdminService.getUsers({}, token || undefined);
+      return result as ApiResponse<UserData>;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+
+  // Fetch services data
+  const {
+    data: servicesData = { data: [] } as ApiResponse<ServiceData>,
+    isLoading: isServicesLoading
+  } = useQuery<ApiResponse<ServiceData>>({
+    queryKey: ['adminServices'],
+    queryFn: async () => {
+      const result = await AdminService.getServices({}, token || undefined);
+      return result as ApiResponse<ServiceData>;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+
+  // Fetch featured services
+  const {
+    data: featuredServices = { data: [] } as ApiResponse<ServiceData>,
+    isLoading: isFeaturedServicesLoading
+  } = useQuery<ApiResponse<ServiceData>>({
+    queryKey: ['featuredServices'],
+    queryFn: async () => {
+      const result = await AdminService.getServices({ featured: true }, token || undefined);
+      return result as ApiResponse<ServiceData>;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+
+  // Define report type interfaces
+  interface ReportItem {
+    date: string;
+    count: number;
+  }
+  
+  interface ReportData {
+    details: ReportItem[];
+    summary: any;
+  }
+
+  // Generate user growth data
+  const {
+    data: userGrowthData = [],
+    isLoading: isUserGrowthLoading
+  } = useQuery({
+    queryKey: ['userGrowth', timeframe],
+    queryFn: async () => {
+      const report = await AdminService.generateReport('users', timeframe, undefined, token || undefined) as { data: ReportData }
+      if (report?.data?.details) {
+        return report.data.details.map((item: ReportItem) => ({
+          name: item.date.substring(5),  // Take only month and day from the date
+          users: item.count
+        }))
       }
-    }
+      return []
+    },
+    staleTime: 15 * 60 * 1000, // 15 minutes
+  })
 
-    if (token) {
-      fetchAdminData()
+  // Generate platform growth data
+  const {
+    data: platformGrowthData = [],
+    isLoading: isPlatformGrowthLoading
+  } = useQuery({
+    queryKey: ['platformGrowth', timeframe],
+    queryFn: async () => {
+      const userReport = await AdminService.generateReport('users', timeframe, undefined, token || undefined) as { data: ReportData }
+      const serviceReport = await AdminService.generateReport('services', timeframe, undefined, token || undefined) as { data: ReportData }
+      const bookingReport = await AdminService.generateReport('bookings', timeframe, undefined, token || undefined) as { data: ReportData }
+      
+      // Combine the data from different reports
+      const dateMap = new Map()
+      
+      if (userReport?.data?.details) {
+        userReport.data.details.forEach((item: ReportItem) => {
+          const date = item.date.substring(5)
+          if (!dateMap.has(date)) {
+            dateMap.set(date, { name: date, users: 0, services: 0, bookings: 0 })
+          }
+          dateMap.get(date).users = item.count
+        })
+      }
+      
+      if (serviceReport?.data?.details) {
+        serviceReport.data.details.forEach((item: ReportItem) => {
+          const date = item.date.substring(5)
+          if (!dateMap.has(date)) {
+            dateMap.set(date, { name: date, users: 0, services: 0, bookings: 0 })
+          }
+          dateMap.get(date).services = item.count
+        })
+      }
+      
+      if (bookingReport?.data?.details) {
+        bookingReport.data.details.forEach((item: ReportItem) => {
+          const date = item.date.substring(5)
+          if (!dateMap.has(date)) {
+            dateMap.set(date, { name: date, users: 0, services: 0, bookings: 0 })
+          }
+          dateMap.get(date).bookings = item.count
+        })
+      }
+      
+      return Array.from(dateMap.values())
+    },
+    staleTime: 15 * 60 * 1000, // 15 minutes
+  })
+  
+  // Service approval mutation
+  const approveServiceMutation = useMutation({
+    mutationFn: (serviceId: string) => AdminService.approveService(serviceId, token || undefined),
+    onSuccess: () => {
+      // Invalidate queries that depend on the approved service
+      queryClient.invalidateQueries({ queryKey: ['pendingServices'] })
+      queryClient.invalidateQueries({ queryKey: ['adminDashboard'] })
     }
-  }, [token, timeframe])
+  })
+  
+  // Handle service approval
+  const handleApproveService = (serviceId: string) => {
+    approveServiceMutation.mutate(serviceId)
+  }
+  
+  // Review moderation mutation
+  const moderateReviewMutation = useMutation({
+    mutationFn: (params: { reviewId: string, action: 'keep' | 'remove' }) => 
+      AdminService.moderateReview(params.reviewId, params.action, token || undefined),
+    onSuccess: () => {
+      // Invalidate flagged content query
+      queryClient.invalidateQueries({ queryKey: ['flaggedContent'] })
+    }
+  })
+  
+  // Handle review moderation
+  const handleModerateReview = (reviewId: string, action: 'keep' | 'remove') => {
+    moderateReviewMutation.mutate({ reviewId, action })
+  }
+  
+  // Ban user mutation
+  const banUserMutation = useMutation({
+    mutationFn: (userId: string) => AdminService.banUser(userId, token || undefined),
+    onSuccess: () => {
+      // Invalidate user-related queries
+      queryClient.invalidateQueries({ queryKey: ['adminUsers'] })
+      queryClient.invalidateQueries({ queryKey: ['adminDashboard'] })
+    }
+  })
+  
+  // Handle user ban
+  const handleBanUser = (userId: string) => {
+    banUserMutation.mutate(userId)
+  }
+  
+  // Resolve dispute mutation
+  const resolveDisputeMutation = useMutation({
+    mutationFn: (params: { disputeId: string, resolution: string }) => 
+      AdminService.resolveDispute(params.disputeId, params.resolution, token || undefined),
+    onSuccess: () => {
+      // Invalidate dispute-related queries
+      queryClient.invalidateQueries({ queryKey: ['disputes'] })
+      queryClient.invalidateQueries({ queryKey: ['disputeStats'] })
+    }
+  })
+  
+  // Handle dispute resolution
+  const handleResolveDispute = (disputeId: string, resolution: string) => {
+    resolveDisputeMutation.mutate({ disputeId, resolution })
+  }
 
   // Generate report data
   const generateReportData = () => {
@@ -585,7 +725,7 @@ const AdminDashboard = () => {
       </div>
 
       {/* System Alerts */}
-      {alerts.map(alert => (
+      {alerts.map((alert: AdminService.SystemAlert) => (
         <SystemAlert 
           key={alert.id}
           title={alert.title}
@@ -598,7 +738,7 @@ const AdminDashboard = () => {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatsCard
           title="Total Users"
-          value={isLoading ? "..." : adminData.totalUsers?.toString() || "0"}
+          value={isDashboardLoading ? "..." : adminData.totalUsers?.toString() || "0"}
           icon={Users}
           change={adminData.newUsersToday?.toString() || "0"}
           changeType="increase"
@@ -606,7 +746,7 @@ const AdminDashboard = () => {
         />
         <StatsCard
           title="Total Services"
-          value={isLoading ? "..." : adminData.totalServices?.toString() || "0"}
+          value={isDashboardLoading ? "..." : adminData.totalServices?.toString() || "0"}
           icon={ShoppingBag}
           change={adminData.newServicesToday?.toString() || "0"}
           changeType="increase"
@@ -614,7 +754,7 @@ const AdminDashboard = () => {
         />
         <StatsCard
           title="Total Bookings"
-          value={isLoading ? "..." : adminData.totalBookings?.toString() || "0"}
+          value={isDashboardLoading ? "..." : adminData.totalBookings?.toString() || "0"}
           icon={Calendar}
           change={adminData.pendingBookings?.toString() || "0"}
           changeType="increase"
@@ -622,7 +762,7 @@ const AdminDashboard = () => {
         />
         <StatsCard
           title="Total Earnings"
-          value={isLoading ? "..." : `KSh ${(adminData.totalEarnings || 0).toLocaleString()}`}
+          value={isDashboardLoading ? "..." : `KSh ${(adminData.totalEarnings || 0).toLocaleString()}`}
           icon={DollarSign}
           subtitle="platform revenue"
         />
@@ -677,7 +817,7 @@ const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-8">
-                  {recentActivity.slice(0, 4).map((activity) => (
+                  {recentActivity.slice(0, 4).map((activity: AdminService.ActivityItem) => (
                     <ActivityItem key={activity.id} item={activity} />
                   ))}
                 </div>
@@ -712,7 +852,7 @@ const AdminDashboard = () => {
                       dataKey="value"
                       label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                     >
-                      {categoryData.map((entry, index) => (
+                      {categoryData.map((entry: AdminService.CategoryItem, index: number) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
@@ -738,7 +878,7 @@ const AdminDashboard = () => {
                     <Tooltip />
                     <Legend />
                     <Bar dataKey="value" fill="#8884d8" name="Services">
-                      {categoryData.map((entry, index) => (
+                      {categoryData.map((entry: AdminService.CategoryItem, index: number) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Bar>
@@ -796,7 +936,7 @@ const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 <ul className="space-y-4">
-                  {isLoading ? (
+                  {isDashboardLoading ? (
                     <p>Loading pending approvals...</p>
                   ) : adminData.pendingServices && adminData.pendingServices.length > 0 ? (
                     adminData.pendingServices.slice(0, 3).map((service) => (
@@ -835,7 +975,7 @@ const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 <ul className="space-y-4">
-                  {flaggedContent.slice(0, 3).map((item) => (
+                  {flaggedContent.slice(0, 3).map((item: AdminService.FlaggedItem) => (
                     <li key={item.id} className="flex items-start justify-between">
                       <div>
                         <div className="flex items-center">
@@ -869,56 +1009,28 @@ const AdminDashboard = () => {
               <CardDescription>View and manage all users on the platform</CardDescription>
             </CardHeader>
             <CardContent>
-              <ReportTable 
-                data={[
-                  {
-                    id: "u1",
-                    name: "John Mwangi",
-                    email: "john.m@students.uoeld.ac.ke",
-                    role: "Provider",
-                    status: "Active",
-                    joinDate: "June 10, 2023",
+              {isUsersLoading ? (
+                <div className="py-10 text-center">
+                  <Skeleton className="h-32 w-full" />
+                </div>
+              ) : (
+                <ReportTable 
+                  data={(usersData.data || []).map((user: UserData) => ({
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    role: user.role,
+                    status: user.status || "Active",
+                    joinDate: new Date(user.createdAt).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    }),
                     actions: ['ban', 'delete']
-                  },
-                  {
-                    id: "u2",
-                    name: "Sarah Wanjiku",
-                    email: "sarah.w@students.uoeld.ac.ke",
-                    role: "Customer",
-                    status: "Active",
-                    joinDate: "July 15, 2023",
-                    actions: ['ban', 'delete']
-                  },
-                  {
-                    id: "u3",
-                    name: "David Omondi",
-                    email: "david.o@students.uoeld.ac.ke",
-                    role: "Provider",
-                    status: "Active",
-                    joinDate: "May 22, 2023",
-                    actions: ['ban', 'delete']
-                  },
-                  {
-                    id: "u4",
-                    name: "Mary Akinyi",
-                    email: "mary.a@students.uoeld.ac.ke",
-                    role: "Customer",
-                    status: "Inactive",
-                    joinDate: "August 5, 2023",
-                    actions: ['ban', 'delete']
-                  },
-                  {
-                    id: "u5",
-                    name: "James Kamau",
-                    email: "james.k@students.uoeld.ac.ke",
-                    role: "Provider",
-                    status: "Active",
-                    joinDate: "September 12, 2023",
-                    actions: ['ban', 'delete']
-                  }
-                ]} 
-                columns={userColumns} 
-              />
+                  }))} 
+                  columns={userColumns} 
+                />
+              )}
             </CardContent>
           </Card>
           
@@ -931,23 +1043,20 @@ const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <RechartsLineChart
-                    data={[
-                      { name: 'Jan', users: 40 },
-                      { name: 'Feb', users: 55 },
-                      { name: 'Mar', users: 70 },
-                      { name: 'Apr', users: 90 },
-                      { name: 'May', users: 120 },
-                      { name: 'Jun', users: 150 }
-                    ]}
-                  >
+                  {isUserGrowthLoading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <Skeleton className="h-full w-full" />
+                    </div>
+                  ) : (
+                    <RechartsLineChart data={userGrowthData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
                     <YAxis />
                     <Tooltip />
                     <Legend />
                     <Line type="monotone" dataKey="users" stroke="#8884d8" activeDot={{ r: 8 }} name="Users" />
-                  </RechartsLineChart>
+                    </RechartsLineChart>
+                  )}
                 </ResponsiveContainer>
               </CardContent>
             </Card>
@@ -994,56 +1103,24 @@ const AdminDashboard = () => {
               <CardDescription>View and manage all services on the platform</CardDescription>
             </CardHeader>
             <CardContent>
-              <ReportTable 
-                data={[
-                  {
-                    id: "s1",
-                    title: "Math Tutoring",
-                    provider: "John Mwangi",
-                    category: "Education",
-                    price: 500,
-                    status: "Active",
+              {isServicesLoading ? (
+                <div className="py-10 text-center">
+                  <Skeleton className="h-32 w-full" />
+                </div>
+              ) : (
+                <ReportTable 
+                  data={(servicesData.data || []).map((service: ServiceData) => ({
+                    id: service.id,
+                    title: service.title,
+                    provider: service.provider?.name || "Unknown",
+                    category: service.category?.name || "Uncategorized",
+                    price: service.price,
+                    status: service.status,
                     actions: ['delete']
-                  },
-                  {
-                    id: "s2",
-                    title: "Food Delivery",
-                    provider: "Sarah Wanjiku",
-                    category: "Food",
-                    price: 150,
-                    status: "Active",
-                    actions: ['delete']
-                  },
-                  {
-                    id: "s3",
-                    title: "Website Development",
-                    provider: "David Omondi",
-                    category: "IT",
-                    price: 2500,
-                    status: "Pending",
-                    actions: ['delete']
-                  },
-                  {
-                    id: "s4",
-                    title: "Laundry Service",
-                    provider: "Mary Akinyi",
-                    category: "Cleaning",
-                    price: 300,
-                    status: "Active",
-                    actions: ['delete']
-                  },
-                  {
-                    id: "s5",
-                    title: "Graphic Design",
-                    provider: "James Kamau",
-                    category: "Design",
-                    price: 800,
-                    status: "Active",
-                    actions: ['delete']
-                  }
-                ]} 
-                columns={serviceColumns} 
-              />
+                  }))} 
+                  columns={serviceColumns} 
+                />
+              )}
             </CardContent>
           </Card>
           
@@ -1094,22 +1171,28 @@ const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {[
-                    { name: "Math Tutoring", provider: "John Mwangi", category: "Education" },
-                    { name: "Food Delivery", provider: "Sarah Wanjiku", category: "Food" },
-                    { name: "Web Development", provider: "David Omondi", category: "IT Services" }
-                  ].map((service, i) => (
-                    <div key={i} className="flex items-center justify-between border-b pb-3">
-                      <div>
-                        <p className="font-medium">{service.name}</p>
-                        <p className="text-sm text-muted-foreground">By {service.provider}</p>
-                      </div>
-                      <div className="flex space-x-2">
-                        <Badge variant="outline">{service.category}</Badge>
-                        <Button variant="outline" size="sm">Remove</Button>
-                      </div>
+                  {isFeaturedServicesLoading ? (
+                    <div className="py-10">
+                      <Skeleton className="h-20 w-full mb-4" />
+                      <Skeleton className="h-20 w-full mb-4" />
+                      <Skeleton className="h-20 w-full" />
                     </div>
-                  ))}
+                  ) : featuredServices.data && featuredServices.data.length > 0 ? (
+                    featuredServices.data.slice(0, 3).map((service: ServiceData) => (
+                      <div key={service.id} className="flex items-center justify-between border-b pb-3">
+                        <div>
+                          <p className="font-medium">{service.title}</p>
+                          <p className="text-sm text-muted-foreground">By {service.provider?.name || "Unknown"}</p>
+                        </div>
+                        <div className="flex space-x-2">
+                          <Badge variant="outline">{service.category?.name || "Uncategorized"}</Badge>
+                          <Button variant="outline" size="sm">Remove</Button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p>No featured services available</p>
+                  )}
                 </div>
               </CardContent>
               <CardFooter>
@@ -1128,7 +1211,7 @@ const AdminDashboard = () => {
             </CardHeader>
             <CardContent>
               <ReportTable 
-                data={disputes}
+                data={disputes as Record<string, any>[]}
                 columns={disputeColumns} 
               />
             </CardContent>
@@ -1209,7 +1292,7 @@ const AdminDashboard = () => {
                       dataKey="value"
                       label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                     >
-                      {categoryData.map((entry, index) => (
+                      {categoryData.map((entry: AdminService.CategoryItem, index: number) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
@@ -1356,16 +1439,12 @@ const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <RechartsLineChart
-                    data={[
-                      { name: 'Jan', users: 40, services: 20, bookings: 15 },
-                      { name: 'Feb', users: 55, services: 25, bookings: 28 },
-                      { name: 'Mar', users: 70, services: 32, bookings: 45 },
-                      { name: 'Apr', users: 90, services: 45, bookings: 65 },
-                      { name: 'May', users: 120, services: 58, bookings: 88 },
-                      { name: 'Jun', users: 150, services: 70, bookings: 110 }
-                    ]}
-                  >
+                  {isPlatformGrowthLoading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <Skeleton className="h-full w-full" />
+                    </div>
+                  ) : (
+                    <RechartsLineChart data={platformGrowthData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
                     <YAxis />
@@ -1374,7 +1453,8 @@ const AdminDashboard = () => {
                     <Line type="monotone" dataKey="users" stroke="#8884d8" activeDot={{ r: 8 }} name="Users" />
                     <Line type="monotone" dataKey="services" stroke="#82ca9d" name="Services" />
                     <Line type="monotone" dataKey="bookings" stroke="#ffc658" name="Bookings" />
-                  </RechartsLineChart>
+                    </RechartsLineChart>
+                  )}
                 </ResponsiveContainer>
               </CardContent>
             </Card>
