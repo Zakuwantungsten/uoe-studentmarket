@@ -468,21 +468,21 @@ export default function ServiceDetailsPage() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Similar Services */}
-          <div className="space-y-6">
-            <h3 className="text-2xl font-semibold text-center mb-6">Similar Services</h3>
-            {isLoading || !service ? (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...Array(6)].map((_, i) => (
-                  <Skeleton key={i} className="h-64 w-full rounded-lg" />
-                ))}
-              </div>
-            ) : (
-              <SimilarServices serviceId={service._id} categoryId={service.category?._id} />
-            )}
-          </div>
         </div>
+      </div>
+      
+      {/* Similar Services - Moved below the booking grid */}
+      <div className="mt-12">
+        <h3 className="text-2xl font-semibold text-center mb-6">Similar Services</h3>
+        {isLoading || !service ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, i) => (
+              <Skeleton key={i} className="h-64 w-full rounded-lg" />
+            ))}
+          </div>
+        ) : (
+          <SimilarServices serviceId={service._id} categoryId={service.category?._id} />
+        )}
       </div>
     </div>
   )

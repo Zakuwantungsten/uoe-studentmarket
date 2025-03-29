@@ -44,6 +44,7 @@ const groupRoutes = require("./routes/group.routes")
 const announcementRoutes = require("./routes/announcement.routes")
 const supportTicketRoutes = require("./routes/supportTicket.routes")
 const bulkNotificationRoutes = require("./routes/bulkNotification.routes")
+const disputeRoutes = require("./routes/dispute.routes")
 
 // Use routes
 app.use("/api/auth", authRoutes)
@@ -64,6 +65,7 @@ app.use("/api/groups", groupRoutes)
 app.use("/api/announcements", announcementRoutes)
 app.use("/api/support-tickets", supportTicketRoutes)
 app.use("/api/bulk-notifications", bulkNotificationRoutes)
+app.use("/api/disputes", disputeRoutes)
 
 // Root route
 app.get("/", (req, res) => {

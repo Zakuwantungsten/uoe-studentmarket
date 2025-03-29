@@ -32,6 +32,28 @@ const reviewSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
+    status: {
+      type: String,
+      enum: ["published", "hidden", "flagged", "under_review"],
+      default: "published",
+    },
+    flagged: {
+      type: Boolean,
+      default: false,
+    },
+    flagReason: {
+      type: String,
+    },
+    flaggedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    flaggedAt: {
+      type: Date,
+    },
+    adminNotes: {
+      type: String,
+    },
   },
   {
     timestamps: true,
