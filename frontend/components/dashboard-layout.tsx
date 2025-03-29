@@ -19,6 +19,7 @@ import {
   Users,
   BarChart,
   FileText,
+  Star,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -44,9 +45,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: Home },
-    { name: "My Services", href: "/my-services", icon: ShoppingBag },
-    { name: "Offer Service", href: "/offer-service", icon: PlusCircle },
+    { name: "My Listings", href: "/my-services", icon: ShoppingBag },
     { name: "Bookings", href: "/bookings", icon: Calendar },
+    { name: "Reviews", href: "/dashboard?tab=reviews", icon: Star },
+    { name: "Reports", href: "/dashboard?tab=reports", icon: FileText },
     { name: "Messages", href: "/messages", icon: MessageSquare },
     { name: "Profile", href: "/profile", icon: User },
     { name: "Settings", href: "/settings", icon: Settings },

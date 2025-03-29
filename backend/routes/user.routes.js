@@ -15,6 +15,9 @@ router.get("/stats", authController.protect, userController.getUserStats)
 // New route for dashboard stats
 router.get("/dashboard-stats", authController.protect, userController.getDashboardStats)
 
+// Route for user reports
+router.get("/reports", authController.protect, userController.getUserReports)
+
 // Get all users (admin only)
 router.get("/", authController.protect, authController.restrictTo("ADMIN"), userController.getAllUsers)
 

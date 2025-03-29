@@ -434,3 +434,220 @@ exports.getDashboardStats = async (req, res) => {
     })
   }
 }
+
+// Get user reports for dashboard
+exports.getUserReports = async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { type = 'bookings', period = 'month' } = req.query
+
+    // Calculate date range based on period
+    const endDate = new Date()
+    let startDate = new Date()
+
+    switch (period) {
+      case 'week':
+        startDate.setDate(endDate.getDate() - 7)
+        break
+      case 'month':
+        startDate.setMonth(endDate.getMonth() - 1)
+        break
+      case 'quarter':
+        startDate.setMonth(endDate.getMonth() - 3)
+        break
+      case 'year':
+        startDate.setFullYear(endDate.getFullYear() - 1)
+        break
+      case 'all':
+        startDate = new Date(0) // Beginning of time
+        break
+      default:
+        startDate.setMonth(endDate.getMonth() - 1) // Default to month
+    }
+
+    let result = {
+      success: true,
+      data: {}
+    }
+
+    // Bookings report
+    if (type === 'bookings') {
+      // Get all user bookings in date range (as provider or customer)
+      const bookings = await Booking.find({
+        $or: [{ provider: userId }, { customer: userId }],
+        createdAt: { $gte: startDate, $lte: endDate }
+      })
+        .populate('service', 'title price')
+        .populate('customer', 'name')
+        .populate('provider', 'name')
+        .sort('-createdAt')
+
+      // Calculate statistics
+      const totalCount = bookings.length
+      const completedCount = bookings.filter(b => b.status === 'completed').length
+      const pendingCount = bookings.filter(b => b.status === 'pending').length
+      const cancelledCount = bookings.filter(b => b.status === 'cancelled').length
+      const completionRate = totalCount > 0 ? completedCount / totalCount : 0
+
+      result.data = {
+        totalCount,
+        completedCount,
+        pendingCount,
+        cancelledCount,
+        completionRate,
+        bookings: bookings.map(booking => ({
+          id: booking._id,
+          date: booking.createdAt,
+          service: booking.service?.title || 'Unknown Service',
+          status: booking.status,
+          customer: booking.customer?.name || 'Unknown User',
+          provider: booking.provider?.name || 'Unknown Provider',
+          amount: booking.totalAmount
+        }))
+      }
+    }
+    // Services report
+    else if (type === 'services') {
+      // Get all user services
+      const services = await Service.find({
+        provider: userId,
+        createdAt: { $gte: startDate, $lte: endDate }
+      })
+        .populate('category', 'name')
+        .sort('-createdAt')
+
+      // Calculate statistics
+      const totalCount = services.length
+      const activeCount = services.filter(s => s.status === 'active').length
+      const inactiveCount = services.filter(s => s.status === 'inactive').length
+      const pendingCount = services.filter(s => s.status === 'pending').length
+
+      // Calculate view count (if view tracking is implemented)
+      const viewCount = services.reduce((sum, service) => sum + (service.viewCount || 0), 0)
+
+      // Find most popular service
+      let mostPopular = null
+      if (services.length > 0) {
+        mostPopular = services.reduce((prev, current) => {
+          return (prev.viewCount || 0) > (current.viewCount || 0) ? prev : current
+        })
+      }
+
+      result.data = {
+        totalCount,
+        activeCount,
+        inactiveCount,
+        pendingCount,
+        viewCount,
+        mostPopular: mostPopular ? {
+          id: mostPopular._id,
+          title: mostPopular.title,
+          viewCount: mostPopular.viewCount || 0
+        } : null,
+        services: services.map(service => ({
+          id: service._id,
+          date: service.createdAt,
+          title: service.title,
+          status: service.status,
+          category: service.category?.name || 'Uncategorized',
+          price: service.price,
+          viewCount: service.viewCount || 0
+        }))
+      }
+    }
+    // Earnings report
+    else if (type === 'earnings') {
+      // Get completed bookings
+      const completedBookings = await Booking.find({
+        provider: userId,
+        status: 'completed',
+        createdAt: { $gte: startDate, $lte: endDate }
+      })
+        .populate('service', 'title')
+        .sort('-createdAt')
+
+      // Calculate statistics
+      const totalEarnings = completedBookings.reduce((sum, booking) => sum + booking.totalAmount, 0)
+      const transactionCount = completedBookings.length
+      const averageEarning = transactionCount > 0 ? totalEarnings / transactionCount : 0
+
+      // Group by month to find best month
+      const earningsByMonth = completedBookings.reduce((acc, booking) => {
+        const month = new Date(booking.createdAt).toLocaleString('default', { month: 'long' })
+        if (!acc[month]) {
+          acc[month] = 0
+        }
+        acc[month] += booking.totalAmount
+        return acc
+      }, {})
+
+      let bestMonth = null
+      let bestMonthAmount = 0
+      
+      for (const [month, amount] of Object.entries(earningsByMonth)) {
+        if (amount > bestMonthAmount) {
+          bestMonth = month
+          bestMonthAmount = amount
+        }
+      }
+
+      result.data = {
+        totalEarnings,
+        transactionCount,
+        averageEarning,
+        bestMonth: bestMonth ? { month: bestMonth, amount: bestMonthAmount } : null,
+        transactions: completedBookings.map(booking => ({
+          id: booking._id,
+          date: booking.createdAt,
+          service: booking.service?.title || 'Unknown Service',
+          amount: booking.totalAmount,
+          customer: booking.customer?.name || 'Unknown User'
+        }))
+      }
+    }
+    // Reviews report
+    else if (type === 'reviews') {
+      // Get reviews received by the user (as service provider)
+      const reviews = await Review.find({
+        serviceProvider: userId,
+        createdAt: { $gte: startDate, $lte: endDate }
+      })
+        .populate('reviewer', 'name')
+        .populate('service', 'title')
+        .sort('-createdAt')
+
+      // Calculate statistics
+      const totalCount = reviews.length
+      const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0)
+      const averageRating = totalCount > 0 ? totalRating / totalCount : 0
+      const positiveCount = reviews.filter(review => review.rating >= 4).length
+      const neutralCount = reviews.filter(review => review.rating === 3).length
+      const negativeCount = reviews.filter(review => review.rating < 3).length
+
+      result.data = {
+        totalCount,
+        averageRating,
+        positiveCount,
+        neutralCount,
+        negativeCount,
+        reviews: reviews.map(review => ({
+          id: review._id,
+          date: review.createdAt,
+          service: review.service?.title || 'Unknown Service',
+          rating: review.rating,
+          comment: review.comment,
+          reviewer: review.reviewer?.name || 'Anonymous User'
+        }))
+      }
+    }
+
+    res.status(200).json(result)
+  } catch (error) {
+    console.error("Error getting user reports:", error)
+    res.status(500).json({
+      success: false,
+      message: "Error getting user reports",
+      error: error.message,
+    })
+  }
+}
