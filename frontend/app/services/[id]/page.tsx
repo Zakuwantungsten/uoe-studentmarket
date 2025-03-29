@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { MapPin, Calendar, Clock, Star, ChevronLeft, Share2, Heart, MessageSquare } from "lucide-react"
+import { MapPin, Calendar, Clock, Star, ChevronLeft, ChevronRight, Share2, Heart, MessageSquare } from "lucide-react"
 
 // Helper function to normalize image URLs - same as in service-card.tsx
 const normalizeImageUrl = (url: string | undefined): string | undefined => {
@@ -73,11 +73,105 @@ import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import BookingCalendar from "@/components/booking-calendar"
 import Reviews from "@/components/reviews"
+import ServiceCard from "@/components/service-card"
 import { serviceService } from "@/lib/services/service-service"
 import { reviewService } from "@/lib/services/review-service"
 import type { Service, Review } from "@/lib/types"
 import { handleApiError } from "@/lib/api-client"
 import { useAuth } from "@/contexts/auth-context"
+
+// Similar Services Component
+function SimilarServices({ serviceId, categoryId }: { serviceId: string, categoryId?: string }) {
+  const [similarServices, setSimilarServices] = useState<Service[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const servicesPerPage = 6;
+  const [totalPages, setTotalPages] = useState(1);
+
+  useEffect(() => {
+    const fetchSimilarServices = async () => {
+      if (!categoryId) return;
+      
+      try {
+        setIsLoading(true);
+        const response = await serviceService.getServices({
+          category: categoryId,
+          page: currentPage,
+          limit: servicesPerPage,
+        });
+        
+        // Filter out the current service
+        const filteredServices = response.data.filter(service => service._id !== serviceId);
+        setSimilarServices(filteredServices);
+        
+        // Calculate total pages - using the total count from response
+        // Handle different response structures safely
+        const total = response.total || 0;
+        setTotalPages(Math.ceil(total / servicesPerPage));
+      } catch (error) {
+        console.error("Failed to fetch similar services:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSimilarServices();
+  }, [categoryId, serviceId, currentPage]);
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {[...Array(4)].map((_, i) => (
+          <Skeleton key={i} className="h-64 w-full rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
+  if (similarServices.length === 0) {
+    return <p className="text-center text-muted-foreground">No similar services found.</p>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {similarServices.map((service) => (
+          <ServiceCard key={service._id} service={service} />
+        ))}
+      </div>
+      
+      {totalPages > 1 && (
+        <div className="flex justify-center mt-6">
+          <nav className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              <span className="sr-only">Previous</span>
+            </Button>
+            
+            <span className="text-sm text-muted-foreground px-4">
+              Page {currentPage} of {totalPages}
+            </span>
+            
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+            >
+              <ChevronRight className="h-4 w-4" />
+              <span className="sr-only">Next</span>
+            </Button>
+          </nav>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ServiceDetailsPage() {
   const { id } = useParams()
@@ -164,12 +258,12 @@ export default function ServiceDetailsPage() {
         <div className="lg:col-span-2 space-y-6">
           {/* Image Gallery */}
           <div className="space-y-4">
-            <div className="relative aspect-video overflow-hidden rounded-lg border">
+            <div className="relative overflow-hidden rounded-lg border" style={{ height: "300px" }}>
               <Image
-                src={normalizeImageUrl(selectedImage || service.images?.[0]) || "/placeholder.svg?height=400&width=800"}
+                src={normalizeImageUrl(selectedImage || service.images?.[0]) || "/placeholder.svg?height=300&width=600"}
                 alt={service.title}
                 fill
-                className="object-cover"
+                className="object-contain"
                 onError={(e) => {
                   // If image fails to load, try alternate URL format before using placeholder
                   const img = e.target as HTMLImageElement;
@@ -360,7 +454,7 @@ export default function ServiceDetailsPage() {
                 </p>
                 <div className="flex gap-2">
                   <Button asChild variant="outline" className="w-full">
-                    <Link href={`/providers/${service.provider?._id}`}>View Profile</Link>
+                    <Link href={`/profile/${service.provider?._id}`}>View Profile</Link>
                   </Button>
                   {isAuthenticated && user?._id !== service.provider?._id && (
                     <Button asChild className="w-full">
@@ -376,13 +470,17 @@ export default function ServiceDetailsPage() {
           </Card>
 
           {/* Similar Services */}
-          <div className="space-y-4">
-            <h3 className="font-medium">Similar Services</h3>
-            <div className="space-y-4">
-              <Skeleton className="h-20 w-full rounded-lg" />
-              <Skeleton className="h-20 w-full rounded-lg" />
-              <Skeleton className="h-20 w-full rounded-lg" />
-            </div>
+          <div className="space-y-6">
+            <h3 className="text-2xl font-semibold text-center mb-6">Similar Services</h3>
+            {isLoading || !service ? (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...Array(6)].map((_, i) => (
+                  <Skeleton key={i} className="h-64 w-full rounded-lg" />
+                ))}
+              </div>
+            ) : (
+              <SimilarServices serviceId={service._id} categoryId={service.category?._id} />
+            )}
           </div>
         </div>
       </div>

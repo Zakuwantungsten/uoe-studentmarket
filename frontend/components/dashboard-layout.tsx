@@ -38,6 +38,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isOpen, setIsOpen] = useState(false)
   const { user } = useAuth()
   const isAdmin = user?.role === "ADMIN"
+  const isAdminPage = pathname.startsWith("/admin")
 
   useEffect(() => {
     setIsOpen(false)
@@ -90,7 +91,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         })}
       </ul>
 
-      {isAdmin && (
+      {isAdmin && isAdminPage && (
         <>
           <div className="px-3 py-2">
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Admin</h3>
@@ -184,11 +185,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
 
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500"></span>
-            </Button>
-
             <Avatar>
               <AvatarImage src="/placeholder.svg?height=32&width=32" alt="User" />
               <AvatarFallback>JD</AvatarFallback>
