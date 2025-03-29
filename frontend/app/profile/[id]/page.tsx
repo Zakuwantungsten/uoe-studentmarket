@@ -39,15 +39,15 @@ export default function UserProfilePage() {
         setUser(userResponse.data)
 
         // Fetch user's services if they are a provider
-        if (userResponse.data.role === "provider") {
+        if (userResponse.data.role === "PROVIDER") {
           const servicesResponse = await apiClient.get<{ success: boolean; data: Service[] }>(
-            `/services?providerId=${id}`,
+            `/services?provider=${id}`,
           )
           setServices(servicesResponse.data)
         }
 
         // Fetch reviews received by the user
-        const reviewsResponse = await apiClient.get<{ success: boolean; data: Review[] }>(`/reviews?userId=${id}`)
+        const reviewsResponse = await apiClient.get<{ success: boolean; data: Review[] }>(`/reviews/provider/${id}`)
         setReviews(reviewsResponse.data)
       } catch (error) {
         handleApiError(error, "Failed to load user profile")
@@ -112,7 +112,7 @@ export default function UserProfilePage() {
               </Avatar>
               <div>
                 <h1 className="text-2xl font-bold text-white">{user.name}</h1>
-                <p className="text-white/80">{user.role === "provider" ? "Service Provider" : "Customer"}</p>
+                <p className="text-white/80">{user.role === "PROVIDER" ? "Service Provider" : "Customer"}</p>
               </div>
             </div>
 
@@ -132,7 +132,7 @@ export default function UserProfilePage() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-6">
             <TabsTrigger value="about">About</TabsTrigger>
-            {user.role === "provider" && <TabsTrigger value="services">Services</TabsTrigger>}
+            {user.role === "PROVIDER" && <TabsTrigger value="services">Services</TabsTrigger>}
             <TabsTrigger value="reviews">Reviews</TabsTrigger>
           </TabsList>
 
@@ -153,10 +153,10 @@ export default function UserProfilePage() {
                       <span>{user.phone}</span>
                     </div>
                   )}
-                  {user.location && (
+                  {user.address && (
                     <div className="flex items-center">
                       <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
-                      <span>{user.location}</span>
+                      <span>{user.address}</span>
                     </div>
                   )}
                   <div className="flex items-center">
@@ -174,19 +174,19 @@ export default function UserProfilePage() {
                   <CardContent>
                     {user.bio ? <p>{user.bio}</p> : <p className="text-muted-foreground">No bio provided</p>}
 
-                    {user.role === "provider" && (
+                    {user.role === "PROVIDER" && (
                       <>
                         <Separator className="my-4" />
 
                         <div className="space-y-4">
-                          {user.badges && user.badges.length > 0 && (
+                          {user.skills && user.skills.length > 0 && (
                             <div>
-                              <h3 className="text-sm font-medium mb-2">Badges</h3>
+                              <h3 className="text-sm font-medium mb-2">Skills</h3>
                               <div className="flex flex-wrap gap-2">
-                                {user.badges.map((badge, index) => (
+                                {user.skills.map((skill, index) => (
                                   <Badge key={index} variant="secondary" className="flex items-center">
                                     <Award className="h-3 w-3 mr-1" />
-                                    {badge}
+                                    {skill}
                                   </Badge>
                                 ))}
                               </div>
@@ -207,7 +207,7 @@ export default function UserProfilePage() {
                                 ))}
                               </div>
                               <span className="ml-2 text-sm">
-                                {user.rating?.toFixed(1) || "0.0"} ({user.totalReviews || 0} reviews)
+                                {user.rating?.toFixed(1) || "0.0"} ({user.reviewCount || 0} reviews)
                               </span>
                             </div>
                           </div>
@@ -220,7 +220,7 @@ export default function UserProfilePage() {
             </div>
           </TabsContent>
 
-          {user.role === "provider" && (
+          {user.role === "PROVIDER" && (
             <TabsContent value="services">
               <Card>
                 <CardHeader>
@@ -249,7 +249,7 @@ export default function UserProfilePage() {
               <CardHeader>
                 <CardTitle>Reviews</CardTitle>
                 <CardDescription>
-                  {user.role === "provider" ? "Reviews received for services" : "Reviews written by this user"}
+                  {user.role === "PROVIDER" ? "Reviews received for services" : "Reviews written by this user"}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -262,14 +262,14 @@ export default function UserProfilePage() {
                             <Avatar className="h-8 w-8">
                               <AvatarImage
                                 src={
-                                  user.role === "provider"
+                                  user.role === "PROVIDER"
                                     ? review.reviewer.profileImage
                                     : review.service.provider.profileImage
                                 }
-                                alt={user.role === "provider" ? review.reviewer.name : review.service.provider.name}
+                                alt={user.role === "PROVIDER" ? review.reviewer.name : review.service.provider.name}
                               />
                               <AvatarFallback>
-                                {(user.role === "provider" ? review.reviewer.name : review.service.provider.name)
+                                {(user.role === "PROVIDER" ? review.reviewer.name : review.service.provider.name)
                                   .split(" ")
                                   .map((n) => n[0])
                                   .join("")}
@@ -277,7 +277,7 @@ export default function UserProfilePage() {
                             </Avatar>
                             <div>
                               <p className="font-medium">
-                                {user.role === "provider" ? review.reviewer.name : review.service.title}
+                                {user.role === "PROVIDER" ? review.reviewer.name : review.service.title}
                               </p>
                               <p className="text-xs text-muted-foreground">
                                 {format(new Date(review.createdAt), "MMM d, yyyy")}

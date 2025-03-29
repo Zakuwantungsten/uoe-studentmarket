@@ -135,6 +135,122 @@ export default function AboutPage() {
                     </div>
                     <div className="flex items-start space-x-2">
                       <CheckCircle className="h-5 w-5 text-primary mt-0.5" />
-                      <span className="text
-\
-
+                      <span className="text-sm">Browse available services</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex flex-col items-center text-center space-y-4">
+                  <div className="bg-primary/10 p-3 rounded-full">
+                    <div className="bg-primary text-primary-foreground w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold">
+                      2
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-bold">Book Services</h3>
+                  <p className="text-muted-foreground">
+                    Find and book the services you need from fellow students
+                  </p>
+                  <div className="flex flex-col space-y-2 w-full">
+                    <div className="flex items-start space-x-2">
+                      <CheckCircle className="h-5 w-5 text-primary mt-0.5" />
+                      <span className="text-sm">Search by category or keyword</span>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <CheckCircle className="h-5 w-5 text-primary mt-0.5" />
+                      <span className="text-sm">Review provider profiles</span>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <CheckCircle className="h-5 w-5 text-primary mt-0.5" />
+                      <span className="text-sm">Schedule and pay securely</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex flex-col items-center text-center space-y-4">
+                  <div className="bg-primary/10 p-3 rounded-full">
+                    <div className="bg-primary text-primary-foreground w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold">
+                      3
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-bold">Offer Your Skills</h3>
+                  <p className="text-muted-foreground">
+                    Create listings for services you can provide to other students
+                  </p>
+                  <div className="flex flex-col space-y-2 w-full">
+                    <div className="flex items-start space-x-2">
+                      <CheckCircle className="h-5 w-5 text-primary mt-0.5" />
+                      <span className="text-sm">List your services and pricing</span>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <CheckCircle className="h-5 w-5 text-primary mt-0.5" />
+                      <span className="text-sm">Set your availability</span>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <CheckCircle className="h-5 w-5 text-primary mt-0.5" />
+                      <span className="text-sm">Receive bookings and payments</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+        
+        {/* Team Section */}
+        <section className="space-y-8">
+          <div className="text-center space-y-4">
+            <h2 className="text-3xl font-bold tracking-tight">Our Team</h2>
+            <p className="max-w-[700px] mx-auto text-muted-foreground">
+              Meet the student entrepreneurs who created and maintain the UoE Student Marketplace
+            </p>
+          </div>
+          
+          <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-8">
+            {[1, 2, 3, 4].map((member) => (
+              <div key={member} className="flex flex-col items-center text-center space-y-3">
+                <div className="relative w-32 h-32 rounded-full overflow-hidden">
+                  <Image 
+                    src="/placeholder-user.jpg" 
+                    alt={`Team member ${member}`}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+                <div>
+                  <h3 className="font-medium">Team Member {member}</h3>
+                  <p className="text-sm text-muted-foreground">Co-Founder</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+        
+        {/* Contact Section */}
+        <section className="bg-muted p-8 rounded-lg">
+          <div className="max-w-3xl mx-auto text-center space-y-4">
+            <h2 className="text-3xl font-bold tracking-tight">Get In Touch</h2>
+            <p className="text-muted-foreground">
+              Have questions about UoE Student Marketplace? We'd love to hear from you!
+            </p>
+            <div className="flex flex-col sm:flex-row justify-center gap-4 mt-4">
+              <a href="/contact" className="bg-primary text-primary-foreground px-8 py-3 rounded-md font-medium hover:bg-primary/90 transition-colors">
+                Contact Us
+              </a>
+              <a href="/faq" className="bg-secondary text-secondary-foreground px-8 py-3 rounded-md font-medium hover:bg-secondary/90 transition-colors">
+                View FAQs
+              </a>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  )
+}
