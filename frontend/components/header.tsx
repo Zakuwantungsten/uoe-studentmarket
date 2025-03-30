@@ -2,7 +2,7 @@
 
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Menu, User, LogOut, MessageSquare, Bell, Settings } from "lucide-react"
@@ -23,12 +23,37 @@ import { useMobile } from "@/hooks/use-mobile"
 import NotificationDropdown from "@/components/notification-dropdown"
 import MobileNav from "@/components/mobile-nav"
 import Image from "next/image"
+import { messageService } from "@/lib/services/message-service"
 
 export default function Header() {
-  const { user, isAuthenticated, logout } = useAuth()
+  const { user, isAuthenticated, logout, token } = useAuth()
   const pathname = usePathname()
   const isMobile = useMobile()
   const [isOpen, setIsOpen] = useState(false)
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0)
+
+  // Fetch unread message count
+  useEffect(() => {
+    if (isAuthenticated && token) {
+      const fetchUnreadCount = async () => {
+        try {
+          const response = await messageService.getUnreadCount(token);
+          if (response.success && response.data && response.data.count !== undefined) {
+            setUnreadMessageCount(response.data.count);
+          }
+        } catch (error) {
+          console.error("Error fetching unread message count:", error);
+        }
+      };
+
+      fetchUnreadCount();
+
+      // Set up interval to periodically check for new messages
+      const interval = setInterval(fetchUnreadCount, 30000); // Check every 30 seconds
+      
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated, token]);
 
   const closeSheet = () => setIsOpen(false)
 
@@ -91,9 +116,12 @@ export default function Header() {
             <>
               {!isMobile && (
                 <>
-                  <Button variant="ghost" size="icon" asChild>
+                  <Button variant="ghost" size="icon" asChild className="relative">
                     <Link href="/messages">
                       <MessageSquare className="h-5 w-5" />
+                      {unreadMessageCount > 0 && (
+                        <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-destructive"></span>
+                      )}
                       <span className="sr-only">Messages</span>
                     </Link>
                   </Button>
@@ -126,7 +154,7 @@ export default function Header() {
                             <item.icon className="mr-2 h-4 w-4" />
                             <span>{item.name}</span>
                           </div>
-                          {item.badge && <Badge className="ml-2">3</Badge>}
+                          {item.badge && unreadMessageCount > 0 && <Badge className="ml-2">{unreadMessageCount}</Badge>}
                         </Link>
                       </DropdownMenuItem>
                     ))}
@@ -199,7 +227,7 @@ export default function Header() {
                               <item.icon className="mr-2 h-4 w-4" />
                               <span>{item.name}</span>
                             </div>
-                            {item.badge && <Badge>3</Badge>}
+                            {item.badge && unreadMessageCount > 0 && <Badge>{unreadMessageCount}</Badge>}
                           </Link>
                         ))}
                       {user?.role === "ADMIN" && (

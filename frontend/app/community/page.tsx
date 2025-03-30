@@ -393,14 +393,14 @@ export default function CommunityPage() {
                   <Card key={discussion._id}>
                     <CardHeader className="pb-2">
                       <div className="flex items-start space-x-4">
-                        <Avatar>
-                          <AvatarFallback>
-                            {discussion.author?.name?.[0] || "U"}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="space-y-1">
-                          <div className="flex items-center space-x-2">
-                            <h3 className="font-medium">{discussion.author?.name || "Unknown User"}</h3>
+                      <Avatar>
+                        <AvatarFallback>
+                          {discussion.author ? (discussion.author.name?.[0] || "U") : "U"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <h3 className="font-medium">{discussion.author ? discussion.author.name : "Unknown User"}</h3>
                             <Badge variant="outline">Student</Badge>
                           </div>
                           <p className="text-xs text-muted-foreground">
@@ -497,7 +497,7 @@ export default function CommunityPage() {
                         </div>
                         <div className="flex items-center space-x-2 mt-2 text-sm">
                           <Users className="h-4 w-4 text-muted-foreground" />
-                          <span>Organized by {event.organizer?.name || "Unknown"}</span>
+                          <span>Organized by {event.organizer ? event.organizer.name : "Unknown"}</span>
                         </div>
                       </CardContent>
                       <CardFooter>
@@ -540,7 +540,7 @@ export default function CommunityPage() {
                     <Card key={group._id}>
                       <CardHeader>
                         <CardTitle>{group.name}</CardTitle>
-                        <CardDescription>Created by {group.creator?.name || "Unknown"}</CardDescription>
+                        <CardDescription>Created by {group.creator ? group.creator.name : "Unknown"}</CardDescription>
                       </CardHeader>
                       <CardContent>
                         <div className="flex -space-x-2 mb-4">

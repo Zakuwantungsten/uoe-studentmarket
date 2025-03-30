@@ -89,7 +89,7 @@ export default function Home() {
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
                         <Input
-                          className="pl-9"
+                          className="pl-9 text-gray-900"
                           placeholder="What service are you looking for?"
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
