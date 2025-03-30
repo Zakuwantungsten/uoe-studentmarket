@@ -5,6 +5,7 @@ const Message = require("./models/message.model")
 const User = require("./models/user.model")
 const mongoose = require("mongoose")
 const dotenv = require("dotenv")
+const notificationController = require("./controllers/notification.controller")
 
 // Load environment variables
 dotenv.config()
@@ -139,6 +140,21 @@ async function handleChatMessage(ws, data) {
     // Populate sender and recipient
     await message.populate("sender", "name image")
     await message.populate("recipient", "name image")
+
+    // Get sender info for notification
+    const sender = await User.findById(ws.userId);
+    
+    // Create notification for the recipient
+    await notificationController.createNotification({
+      recipient: recipientId,
+      type: "message",
+      title: `New message from ${sender ? sender.name : "Someone"}`,
+      content: content.length > 50 ? content.substring(0, 50) + "..." : content,
+      data: {
+        userId: ws.userId,
+        messageId: message._id
+      }
+    })
 
     // Send message to sender for confirmation
     ws.send(

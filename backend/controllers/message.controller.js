@@ -1,6 +1,7 @@
 const Message = require("../models/message.model")
 const User = require("../models/user.model")
 const mongoose = require("mongoose")
+const notificationController = require("../controllers/notification.controller")
 
 // Send a message
 exports.sendMessage = async (req, res) => {
@@ -51,6 +52,21 @@ exports.sendMessage = async (req, res) => {
     // Populate sender and recipient
     await message.populate("sender", "name image")
     await message.populate("recipient", "name image")
+
+    // Get sender info for notification
+    const sender = await User.findById(senderObjectId);
+    
+    // Create notification for the recipient
+    await notificationController.createNotification({
+      recipient: recipientObjectId,
+      type: "message",
+      title: `New message from ${sender ? sender.name : "Someone"}`,
+      content: content.length > 50 ? content.substring(0, 50) + "..." : content,
+      data: {
+        userId: senderObjectId,
+        messageId: message._id
+      }
+    })
 
     res.status(201).json({
       success: true,
