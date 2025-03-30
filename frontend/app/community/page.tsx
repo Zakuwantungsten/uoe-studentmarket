@@ -395,7 +395,7 @@ export default function CommunityPage() {
                       <div className="flex items-start space-x-4">
                       <Avatar>
                         <AvatarFallback>
-                          {discussion.author ? (discussion.author.name?.[0] || "U") : "U"}
+                          {discussion.author?.name ? discussion.author.name[0] : "U"}
                         </AvatarFallback>
                       </Avatar>
                       <div className="space-y-1">
