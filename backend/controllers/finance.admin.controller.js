@@ -5,6 +5,140 @@ const Category = require("../models/category.model")
 const User = require("../models/user.model")
 const mongoose = require("mongoose")
 
+// Get revenue data by time period
+exports.getRevenueData = async (req, res) => {
+  try {
+    const period = req.query.period || 'week'
+    const endDate = new Date()
+    let startDate = new Date()
+    let interval = 'day'
+    let format = '%Y-%m-%d'
+    
+    // Calculate date range based on period
+    switch (period) {
+      case 'day':
+        // Last 24 hours
+        startDate.setDate(startDate.getDate() - 1)
+        interval = 'hour'
+        format = '%Y-%m-%d %H:00'
+        break
+      case 'week':
+        // Last 7 days
+        startDate.setDate(startDate.getDate() - 7)
+        break
+      case 'month':
+        // Last 30 days
+        startDate.setDate(startDate.getDate() - 30)
+        break
+      case 'quarter':
+        // Last 90 days
+        startDate.setDate(startDate.getDate() - 90)
+        break
+      case 'year':
+        // Last 12 months
+        startDate.setFullYear(startDate.getFullYear() - 1)
+        interval = 'month'
+        format = '%Y-%m'
+        break
+      default:
+        // Default to week
+        startDate.setDate(startDate.getDate() - 7)
+    }
+
+    // Group data based on interval
+    const groupBy = {}
+    if (interval === 'hour') {
+      groupBy._id = {
+        year: { $year: "$createdAt" },
+        month: { $month: "$createdAt" },
+        day: { $dayOfMonth: "$createdAt" },
+        hour: { $hour: "$createdAt" }
+      }
+    } else if (interval === 'month') {
+      groupBy._id = {
+        year: { $year: "$createdAt" },
+        month: { $month: "$createdAt" }
+      }
+    } else {
+      // Default to daily
+      groupBy._id = {
+        year: { $year: "$createdAt" },
+        month: { $month: "$createdAt" },
+        day: { $dayOfMonth: "$createdAt" }
+      }
+    }
+
+    // Get revenue data
+    const revenueData = await Booking.aggregate([
+      {
+        $match: {
+          status: "completed",
+          createdAt: { $gte: startDate, $lte: endDate }
+        }
+      },
+      {
+        $group: {
+          ...groupBy,
+          revenue: { $sum: "$totalAmount" },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1, "_id.hour": 1 }
+      }
+    ])
+
+    // Format response data
+    const formattedData = revenueData.map(item => {
+      let date, name
+      
+      if (interval === 'hour') {
+        date = new Date(
+          item._id.year, 
+          item._id.month - 1, 
+          item._id.day, 
+          item._id.hour
+        )
+        name = `${item._id.hour}:00`
+      } else if (interval === 'month') {
+        date = new Date(item._id.year, item._id.month - 1, 1)
+        name = `${date.toLocaleString('default', { month: 'short' })} ${item._id.year}`
+      } else {
+        date = new Date(
+          item._id.year, 
+          item._id.month - 1, 
+          item._id.day
+        )
+        name = `${date.toLocaleString('default', { month: 'short' })} ${item._id.day}`
+      }
+
+      return {
+        name,
+        revenue: item.revenue,
+        date: date.toISOString().split('T')[0],
+        count: item.count
+      }
+    })
+
+    res.status(200).json({
+      success: true,
+      dateRange: {
+        startDate,
+        endDate,
+        period
+      },
+      data: formattedData
+    })
+  } catch (error) {
+    console.error("Error getting revenue data:", error)
+    res.status(500).json({
+      success: false,
+      message: "Error getting revenue data",
+      error: error.message
+    })
+  }
+}
+
 // Get revenue by category
 exports.getRevenueByCategory = async (req, res) => {
   try {

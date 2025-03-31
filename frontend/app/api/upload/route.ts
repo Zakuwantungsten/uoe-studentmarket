@@ -65,13 +65,20 @@ export async function POST(req: Request) {
         if (response.ok) {
           const data = await response.json()
           
-          return NextResponse.json({
-            success: true,
-            data: {
-              url: data.file.url,
-              filename: data.file.filename,
-            },
-          })
+          // Validate that the backend response contains the expected URL
+          if (data && data.file && data.file.url) {
+            console.log("Backend upload successful with URL:", data.file.url)
+            return NextResponse.json({
+              success: true,
+              data: {
+                url: data.file.url,
+                filename: data.file.filename || fileName,
+              },
+            })
+          } else {
+            console.error("Backend upload succeeded but returned invalid response:", data)
+            // Continue to fallback URL below since backend didn't provide a valid URL
+          }
         }
       } catch (error) {
         console.error("Backend upload failed, using local mock URL:", error)

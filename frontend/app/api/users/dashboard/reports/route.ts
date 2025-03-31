@@ -19,9 +19,16 @@ export async function GET(req: Request) {
     const type = url.searchParams.get("type") || "bookings" // Default to bookings
     const period = url.searchParams.get("period") || "month" // Default to month
 
-    // Fetch reports data from backend
+    // Handle URL construction to avoid duplicate /api paths
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+    // Extract the base URL (without /api) for constructing the path
+    const baseUrl = apiUrl.endsWith('/api') 
+      ? apiUrl.slice(0, -4) // Remove trailing /api
+      : apiUrl;
+
+    // Fetch reports data from backend - avoid duplicate /api in the path
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/users/reports?type=${type}&period=${period}`,
+      `${baseUrl}/api/users/reports?type=${type}&period=${period}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,

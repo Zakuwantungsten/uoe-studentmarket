@@ -263,16 +263,39 @@ export async function getFlaggedContent(token?: string): Promise<FlaggedItem[]> 
 // Get system alerts
 export async function getSystemAlerts(token?: string): Promise<SystemAlert[]> {
   try {
-    const response = await apiClient.get<{ success: boolean; data: SystemAlert[] }>(
-      "/admin/system/alerts",
-      { token }
-    )
+    // TODO: Replace mock data with actual API call once backend endpoint is implemented
+    // Mock data for system alerts until backend implementation is available
+    const mockSystemAlerts: SystemAlert[] = [
+      {
+        id: "1",
+        title: "System Maintenance",
+        description: "Scheduled maintenance will occur tomorrow at 2:00 AM UTC. The system may be unavailable for up to 30 minutes.",
+        severity: "info"
+      },
+      {
+        id: "2",
+        title: "High Server Load",
+        description: "The system is experiencing higher than normal load. Some operations may be slower than usual.",
+        severity: "warning"
+      },
+      {
+        id: "3",
+        title: "New Security Update",
+        description: "A security update has been applied to protect against recent vulnerabilities.",
+        severity: "info"
+      },
+      {
+        id: "4",
+        title: "Database Connectivity Issues",
+        description: "We're experiencing intermittent database connectivity issues. Our team is working on resolving this.",
+        severity: "critical"
+      }
+    ];
+
+    // Simulate API response delay
+    await new Promise(resolve => setTimeout(resolve, 300));
     
-    if (!response.success) {
-      throw new Error("Failed to load system alerts")
-    }
-    
-    return response.data
+    return mockSystemAlerts;
   } catch (error) {
     handleApiError(error, "Failed to load system alerts")
     return []

@@ -215,13 +215,23 @@ export default function OfferServicePage() {
             data: { url: string } 
           }
           
-          console.log("Upload response:", response);
+          console.log("Upload response:", JSON.stringify(response, null, 2));
           
           if (response?.success && response?.data?.url) {
             imageUrl = response.data.url
             console.log("Successfully uploaded image, URL:", imageUrl)
+            
+            // Validate URL format
+            if (!imageUrl.startsWith('http') && !imageUrl.startsWith('/')) {
+              imageUrl = '/' + imageUrl;
+            }
           } else {
             console.error("Upload succeeded but no URL returned:", response)
+            toast({
+              title: "Warning",
+              description: "Image upload completed but may not have been processed correctly. Your service will be created without an image.",
+              variant: "destructive",
+            })
           }
         } catch (uploadError) {
           console.error("Error uploading image:", uploadError)
@@ -239,11 +249,24 @@ export default function OfferServicePage() {
       // Transform features from string array to object array as expected by backend
       const formattedFeatures = formData.features.map(feature => ({ feature }))
       
-      // Ensure we have a final image URL
-      const finalImageUrl = imageUrl || "";
+      // Ensure we have a final image URL and process it
+      let finalImageUrl = imageUrl || "";
       
       // Log the image URL for debugging
-      console.log("Final image URL for service:", finalImageUrl);
+      console.log("Initial image URL for service:", finalImageUrl);
+      
+      // Make sure the URL is valid and not empty
+      if (finalImageUrl && finalImageUrl.trim().length > 0) {
+        // If we have a valid URL, check if it's absolute
+        if (!finalImageUrl.startsWith('http') && !finalImageUrl.startsWith('/')) {
+          // Add leading slash if it's not already absolute and doesn't have a slash
+          finalImageUrl = '/' + finalImageUrl;
+        }
+        
+        console.log("Final validated image URL:", finalImageUrl);
+      } else {
+        console.warn("No valid image URL found, keeping as empty string");
+      }
       
       const serviceData = {
         ...restFormData,
@@ -261,25 +284,43 @@ export default function OfferServicePage() {
       }
 
       // Log the service data being sent
-      console.log("Creating service with data:", {
+      console.log("Creating service with data:", JSON.stringify({
         ...serviceData,
-        image: serviceData.image ? 'Image URL present' : 'No image URL',
+        image: serviceData.image ? 'Image URL present: ' + serviceData.image : 'No image URL',
         imageLength: serviceData.image ? serviceData.image.length : 0,
         imageType: serviceData.image ? typeof serviceData.image : 'undefined'
-      });
+      }, null, 2));
 
-      // Use type assertion to resolve TypeScript error
-      const response = await serviceService.createService(serviceData as any, token as string);
-      
-      // Log the response to see what was actually saved
-      console.log("Service creation response:", response);
+      try {
+        // Use type assertion to resolve TypeScript error
+        const response = await serviceService.createService(serviceData as any, token as string);
+        
+        // Log the response to see what was actually saved
+        console.log("Service creation response:", JSON.stringify(response, null, 2));
+        
+        // Verify if image was saved correctly
+        // Use type assertion to access image property which might not be in the type definition
+        const savedImage = (response?.data as any)?.image || '';
+        if (!savedImage && finalImageUrl) {
+          console.warn("Image may not have been saved correctly. Sent:", finalImageUrl, "Received:", savedImage);
+        }
+        
+        toast({
+          title: "Success",
+          description: "Your service has been created successfully!",
+        });
+        
+        router.push("/my-services");
+      } catch (serviceError: any) {
+        console.error("Error creating service:", serviceError);
+        toast({
+          title: "Error",
+          description: serviceError?.message || "Failed to create service. Please try again.",
+          variant: "destructive",
+        });
+      }
 
-      toast({
-        title: "Success",
-        description: "Your service has been created successfully!",
-      })
-
-      router.push("/my-services")
+      // Success toast and redirect is handled in the inner try block now, no need for this duplicate code
     } catch (error: any) {
       console.error("Error creating service:", error)
       toast({

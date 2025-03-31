@@ -1,6 +1,6 @@
 import { toast } from "@/components/ui/use-toast"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 // Extract the base URL (without /api) for handling paths that include /api
 const BASE_URL = API_URL.endsWith('/api') 
   ? API_URL.slice(0, -4) // Remove trailing /api
@@ -63,6 +63,8 @@ async function fetchApi<T>(endpoint: string, options: FetchOptions = {}): Promis
   }
 
   try {
+    console.log('API Request:', endpoint, options);
+    
     const response = await fetch(url.toString(), {
       ...fetchOptions,
       headers,
@@ -72,22 +74,32 @@ async function fetchApi<T>(endpoint: string, options: FetchOptions = {}): Promis
     const contentType = response.headers.get('content-type')
     let data: any
     
-    if (contentType && contentType.includes('application/json')) {
-      // Parse JSON response
-      try {
-        data = await response.json()
-      } catch (parseError) {
-        // If JSON parsing fails, get text content instead
-        const textContent = await response.text()
-        console.error('JSON parsing error:', parseError, 'Response text:', textContent.substring(0, 200))
-        throw new ApiError(`Failed to parse JSON response: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`, response.status, textContent)
-      }
-    } else {
-      // For non-JSON responses, get text content
-      const textContent = await response.text()
-      
+    // Get text content first, regardless of Content-Type
+    const textContent = await response.text()
+    
+    // Try to parse as JSON first, even if Content-Type is not application/json
+    try {
+      data = JSON.parse(textContent)
+    } catch (parseError) {
+      // If not parseable as JSON, check if it's an error response
       if (!response.ok) {
-        console.error(`Non-JSON error response (${response.status}):`, textContent.substring(0, 200))
+        // Enhanced logging for debugging non-JSON error responses
+        console.error(
+          `Non-JSON error response (${response.status}):`, 
+          textContent.substring(0, 200),
+          `\nRequest URL: ${url.toString()}`,
+          `\nContent-Type: ${contentType || 'not specified'}`
+        )
+        
+        // Check if this looks like an HTML error page
+        if (textContent.includes('<!DOCTYPE html>') || textContent.includes('<html')) {
+          throw new ApiError(
+            `Server returned HTML instead of JSON. This may indicate an authentication issue, a server error, or an invalid URL.`, 
+            response.status, 
+            textContent
+          )
+        }
+        
         throw new ApiError(`Server returned non-JSON response: ${textContent.substring(0, 100)}...`, response.status, textContent)
       }
       
@@ -95,17 +107,27 @@ async function fetchApi<T>(endpoint: string, options: FetchOptions = {}): Promis
       data = { text: textContent, _isTextResponse: true }
     }
 
+    console.log('API Response:', data);
+    
     // Handle API errors with improved error message extraction
     if (!response.ok) {
       const errorMessage = data?.message || 
                           (data?.error?.message) || 
                           (typeof data === 'string' ? data : "Something went wrong")
-      console.error(`API Error (${response.status}):`, errorMessage, data)
+      console.error(
+        `API Error (${response.status}):`, 
+        errorMessage, 
+        data,
+        `\nRequest URL: ${url.toString()}`,
+        `\nHeaders:`, Object.fromEntries([...headers.entries()].filter(([key]) => !key.toLowerCase().includes('authorization')))
+      )
       throw new ApiError(errorMessage, response.status, data)
     }
 
     return data
   } catch (error) {
+    console.log('API Error:', error);
+    
     if (error instanceof ApiError) {
       throw error
     }

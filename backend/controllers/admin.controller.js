@@ -6,6 +6,48 @@ const Category = require("../models/category.model")
 const Transaction = require("../models/transaction.model")
 const mongoose = require("mongoose")
 
+// Get all flagged content for moderation
+exports.getFlaggedContent = async (req, res) => {
+  try {
+    // Get flagged reviews
+    const flaggedReviews = await Review.find({ flagged: true })
+      .populate("reviewer", "name email image")
+      .populate("service", "title")
+      .populate("flaggedBy", "name email")
+      .sort("-flaggedAt")
+
+    // Transform reviews to the expected format
+    const formattedReviews = flaggedReviews.map(review => ({
+      id: review._id.toString(),
+      type: "review",
+      content: review.comment,
+      reporter: review.flaggedBy ? review.flaggedBy.name : "System",
+      reported: review.reviewer ? review.reviewer.name : "Unknown User",
+      date: review.flaggedAt || review.createdAt,
+      status: review.status
+    }))
+
+    // Combine all flagged content
+    // In the future, add other content types here (comments, discussions, etc.)
+    const allFlaggedContent = [
+      ...formattedReviews,
+      // Add other content types here as they are implemented
+    ]
+
+    res.status(200).json({
+      success: true,
+      data: allFlaggedContent
+    })
+  } catch (error) {
+    console.error("Error getting flagged content:", error)
+    res.status(500).json({
+      success: false,
+      message: "Error getting flagged content",
+      error: error.message,
+    })
+  }
+}
+
 // Get dashboard statistics
 exports.getDashboardStats = async (req, res) => {
   try {
@@ -406,6 +448,80 @@ exports.getBookingStats = async (req, res) => {
   }
 }
 
+// Get recent activity
+exports.getRecentActivity = async (req, res) => {
+  try {
+    // Get recent activities
+    const recentActivities = await Promise.all([
+      User.find().sort("-createdAt").limit(5).select("name email role createdAt image"),
+      Service.find().sort("-createdAt").limit(5).populate("provider", "name").select("title price createdAt status"),
+      Booking.find()
+        .sort("-createdAt")
+        .limit(5)
+        .populate("customer", "name")
+        .populate("service", "title")
+        .select("status totalAmount createdAt"),
+    ])
+
+    // Transform to expected format
+    const formattedActivities = [
+      // User signups
+      ...recentActivities[0].map(user => ({
+        id: user._id.toString(),
+        type: "signup",
+        description: `New user registered: ${user.name}`,
+        user: {
+          id: user._id.toString(),
+          name: user.name,
+          image: user.image
+        },
+        timestamp: user.createdAt,
+      })),
+      
+      // New services
+      ...recentActivities[1].map(service => ({
+        id: service._id.toString(),
+        type: "service",
+        description: `New service listed: ${service.title}`,
+        user: service.provider ? {
+          id: service.provider._id.toString(),
+          name: service.provider.name,
+        } : undefined,
+        timestamp: service.createdAt,
+        status: service.status
+      })),
+      
+      // Bookings
+      ...recentActivities[2].map(booking => ({
+        id: booking._id.toString(),
+        type: "booking",
+        description: `New booking: ${booking.service ? booking.service.title : 'Service'}`,
+        user: booking.customer ? {
+          id: booking.customer._id.toString(),
+          name: booking.customer.name,
+        } : undefined,
+        timestamp: booking.createdAt,
+        status: booking.status
+      }))
+    ]
+
+    // Sort by timestamp (most recent first)
+    formattedActivities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+
+    res.status(200).json({
+      success: true,
+      data: formattedActivities
+    })
+  } catch (error) {
+    console.error("Error getting recent activity:", error)
+    res.status(500).json({
+      success: false,
+      message: "Error fetching recent activity",
+      error: error.message,
+    })
+  }
+}
+
 // Get revenue statistics
 exports.getRevenueStats = async (req, res) => {
   try {
@@ -697,6 +813,45 @@ exports.deleteUser = async (req, res) => {
   }
 }
 
+// Get pending services
+exports.getPendingServices = async (req, res) => {
+  try {
+    const page = Number.parseInt(req.query.page) || 1
+    const limit = Number.parseInt(req.query.limit) || 10
+    const skip = (page - 1) * limit
+
+    // Filter by pending status
+    const filter = { status: "pending" }
+
+    // Execute query with pagination
+    const pendingServices = await Service.find(filter)
+      .populate("provider", "name email image")
+      .populate("category", "name")
+      .skip(skip)
+      .limit(limit)
+      .sort(req.query.sort || "-createdAt")
+
+    // Get total count for pagination
+    const total = await Service.countDocuments(filter)
+
+    res.status(200).json({
+      success: true,
+      count: pendingServices.length,
+      total,
+      totalPages: Math.ceil(total / limit),
+      currentPage: page,
+      data: pendingServices,
+    })
+  } catch (error) {
+    console.error("Error getting pending services:", error)
+    res.status(500).json({
+      success: false,
+      message: "Error getting pending services",
+      error: error.message,
+    })
+  }
+}
+
 // Get all services (admin)
 exports.getAllServices = async (req, res) => {
   try {
@@ -806,6 +961,56 @@ exports.getAllBookings = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error getting bookings",
+      error: error.message,
+    })
+  }
+}
+
+// Get category distribution
+exports.getCategoryDistribution = async (req, res) => {
+  try {
+    // Get service counts by category
+    const categoryDistribution = await Service.aggregate([
+      {
+        $group: {
+          _id: "$category",
+          count: { $sum: 1 },
+          avgPrice: { $avg: "$price" }
+        },
+      },
+      {
+        $lookup: {
+          from: "categories",
+          localField: "_id",
+          foreignField: "_id",
+          as: "category",
+        },
+      },
+      {
+        $unwind: "$category",
+      },
+      {
+        $project: {
+          _id: "$category._id",
+          name: "$category.name",
+          count: 1,
+          value: "$avgPrice" // Using average price as the value metric
+        },
+      },
+      {
+        $sort: { count: -1 },
+      },
+    ])
+
+    res.status(200).json({
+      success: true,
+      data: categoryDistribution
+    })
+  } catch (error) {
+    console.error("Error getting category distribution:", error)
+    res.status(500).json({
+      success: false,
+      message: "Error getting category distribution",
       error: error.message,
     })
   }
